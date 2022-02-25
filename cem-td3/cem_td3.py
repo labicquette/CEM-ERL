@@ -12,12 +12,17 @@ import hydra
 import salina
 
 from gym.wrappers import TimeLimit
-
+import salina.rl.functional as RLF
 from salina import Agent, get_arguments, instantiate_class, Workspace, get_class, instantiate_class
-from salina.agents import Agents, RemoteAgent, TemporalAgent
-from salina.agents.gyma import NoAutoResetGymAgent, GymAgent
+from salina.agents import Agents, RemoteAgent, TemporalAgent, NRemoteAgent
+from salina.agents.gyma import NoAutoResetGymAgent, GymAgent, AutoResetGymAgent
+from salina.agents.asynchronous import AsynchronousAgent
 
 from omegaconf import DictConfig, OmegaConf
+
+from salina.logger import TFLogger
+from salina.rl.replay_buffer import ReplayBuffer
+from salina_examples import weight_init
 
 import torch.multiprocessing as mp
 
@@ -77,7 +82,25 @@ class CovMatrix():
     def update_covariance(self, elite_weights) -> None:
       self.cov = torch.cov(elite_weights.T) + self.noise
 
-def run_cem(cfg):
+
+def soft_update_params(net, target_net, tau):
+    for param, target_param in zip(net.parameters(), target_net.parameters()):
+        target_param.data.copy_(tau * param.data + (1 - tau) * target_param.data)
+
+
+def _state_dict(agent, device):
+    sd = agent.state_dict()
+    for k, v in sd.items():
+        sd[k] = v.to(device)
+    return sd
+
+def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
+
+
+
+
+
+
   # 1)  Build the  logger
   torch.manual_seed(cfg.algorithm.env_seed)
   logger = instantiate_class(cfg.logger)
@@ -106,6 +129,84 @@ def run_cem(cfg):
                      )
 
   best_score = -np.inf
+
+
+  #TD3
+  q_target_agent_1 = copy.deepcopy(q_agent_1)
+  q_target_agent_2 = copy.deepcopy(q_agent_2)
+  action_target_agent = copy.deepcopy(action_agent)
+
+  acq_action_agent = copy.deepcopy(action_agent)
+  acq_agent = TemporalAgent(Agents(env_agent, acq_action_agent))
+  acq_remote_agent, acq_workspace = NRemoteAgent.create(
+      acq_agent,
+      num_processes=cfg.algorithm.n_processes,
+      t=0,
+      n_steps=cfg.algorithm.n_timesteps,
+      epsilon=1.0,
+  ) 
+  acq_remote_agent.seed(cfg.algorithm.env_seed)
+
+  # == Setting up the training agents
+  train_temporal_q_agent_1 = TemporalAgent(q_agent_1)
+  train_temporal_q_agent_2 = TemporalAgent(q_agent_2)
+  train_temporal_action_agent = TemporalAgent(action_agent)
+  train_temporal_q_target_agent_1 = TemporalAgent(q_target_agent_1)
+  train_temporal_q_target_agent_2 = TemporalAgent(q_target_agent_2)
+  train_temporal_action_target_agent = TemporalAgent(action_target_agent)
+
+  train_temporal_q_agent_1.to(cfg.algorithm.loss_device)
+  train_temporal_q_agent_2.to(cfg.algorithm.loss_device)
+  train_temporal_action_agent.to(cfg.algorithm.loss_device)
+  train_temporal_q_target_agent_1.to(cfg.algorithm.loss_device)
+  train_temporal_q_target_agent_2.to(cfg.algorithm.loss_device)
+  train_temporal_action_target_agent.to(cfg.algorithm.loss_device)
+
+  acq_remote_agent(
+    acq_workspace,
+    t=0,
+    n_steps=cfg.algorithm.n_timesteps,
+      epsilon=cfg.algorithm.action_noise,
+  )
+
+  # == Setting up & initializing the replay buffer for DQN
+  replay_buffer = ReplayBuffer(cfg.algorithm.buffer_size)
+  replay_buffer.put(acq_workspace, time_size=cfg.algorithm.buffer_time_size)
+  """Replay Buffer bien initialise ou pas ?"""
+
+  logger.message("[DDQN] Initializing replay buffer")
+  while replay_buffer.size() < cfg.algorithm.initial_buffer_size:
+      acq_workspace.copy_n_last_steps(cfg.algorithm.overlapping_timesteps)
+      acq_remote_agent(
+          acq_workspace,
+          t=cfg.algorithm.overlapping_timesteps,
+          n_steps=cfg.algorithm.n_timesteps - cfg.algorithm.overlapping_timesteps,
+          epsilon=cfg.algorithm.action_noise,
+      )
+      replay_buffer.put(acq_workspace, time_size=cfg.algorithm.buffer_time_size)
+  """Initialisation replay buffer jusqu'ici"""
+
+  logger.message("[DDQN] Learning")
+  n_interactions = 0
+  optimizer_args = get_arguments(cfg.algorithm.optimizer)
+  optimizer_q_1 = get_class(cfg.algorithm.optimizer)(
+      q_agent_1.parameters(), **optimizer_args
+  )
+  optimizer_q_2 = get_class(cfg.algorithm.optimizer)(
+      q_agent_2.parameters(), **optimizer_args
+  )
+  optimizer_action = get_class(cfg.algorithm.optimizer)(
+      action_agent.parameters(), **optimizer_args
+  )
+  iteration = 0
+
+  #TD3
+
+
+
+  """TD3 implemente jusqu'ici"""
+
+
 
   # 7) Training loop
   for epoch in range(cfg.algorithm.max_epochs):
@@ -159,11 +260,17 @@ def run_cem(cfg):
   for a in temporal_agents:
     a.close()
 
-@hydra.main(config_path=".", config_name="main.yaml")
-def main(cfg):
-
+#@hydra.main(config_path=".", config_name="gym.yaml")
+def main():
+    cfg=OmegaConf.load("gym.yaml")
     mp.set_start_method("spawn")
-    run_cem(cfg)
+    logger = instantiate_class(cfg.logger)
+    logger.save_hps(cfg)
+    q_agent_1 = instantiate_class(cfg.q_agent)
+    q_agent_2 = instantiate_class(cfg.q_agent)
+    q_agent_2.apply(weight_init)
+    action_agent = instantiate_class(cfg.action_agent)
+    run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg)
 
 if __name__ == "__main__":
     main()
