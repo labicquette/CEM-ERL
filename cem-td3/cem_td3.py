@@ -26,6 +26,7 @@ from salina_examples import weight_init
 
 import torch.multiprocessing as mp
 
+from agents import QMLPAgent, make_gym_env, ActionMLPAgent
 
 
 class ActionAgent(Agent):
@@ -260,16 +261,18 @@ def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
   for a in temporal_agents:
     a.close()
 
-#@hydra.main(config_path=".", config_name="gym.yaml")
-def main():
-    cfg=OmegaConf.load("gym.yaml")
+@hydra.main(config_path=".", config_name="gym.yaml")
+def main(cfg):
+    #cfg=OmegaConf.load("gym.yaml")
     mp.set_start_method("spawn")
     logger = instantiate_class(cfg.logger)
     logger.save_hps(cfg)
-    q_agent_1 = instantiate_class(cfg.q_agent)
-    q_agent_2 = instantiate_class(cfg.q_agent)
+    #q_agent_1 = instantiate_class(cfg.q_agent)
+    q_agent_1 = QMLPAgent(**cfg.q_agent)
+    #q_agent_2 = instantiate_class(cfg.q_agent)
+    q_agent_2 = QMLPAgent(**cfg.q_agent)
     q_agent_2.apply(weight_init)
-    action_agent = instantiate_class(cfg.action_agent)
+    action_agent = ActionMLPAgent(**cfg.action_agent)
     run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg)
 
 if __name__ == "__main__":
