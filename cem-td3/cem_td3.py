@@ -258,7 +258,6 @@ def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
         cfg.algorithm.loss_device
       )
       done, reward = replay_workspace["env/done", "env/reward"]
-
       train_temporal_q_agent_1(
         replay_workspace,
         t=0,
@@ -352,6 +351,8 @@ def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
         q = q * (1.0 - done.float())
         optimizer_action.zero_grad()
         loss = -q.mean()
+        td3_loss = loss
+        """loss to use"""
         loss.backward()
 
         if cfg.algorithm.clip_grad > 0:
@@ -369,6 +370,13 @@ def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
         soft_update_params(action_agent, action_target_agent, tau)
 
       iteration += 1
+
+    
+    if epoch % cfg.algorithm.td3_update_modulo: 
+      for idx_agent in range(cfg.algorithm.n_processes):
+        soft_update_params(action_agent, temporal_agents[idx_agent].agent.agent.agents[1], tau)
+      logger.message("TD3 Pop Introduction")
+
 
     print("Best score: ", best_score)
     # Keep only best individuals to compute the new centroid
