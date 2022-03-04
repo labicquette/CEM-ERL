@@ -377,7 +377,7 @@ def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
     
     if epoch % cfg.algorithm.td3_update_modulo: 
       for idx_agent in range(cfg.algorithm.n_processes):
-        soft_update_params(action_agent, temporal_agents[idx_agent].agent.agent.agents[1], tau)
+        set_params(action_agent, temporal_agents[idx_agent].agent.agent.agents[1], tau)
       logger.message("TD3 Pop Introduction")
 
 
