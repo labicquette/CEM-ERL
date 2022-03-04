@@ -218,6 +218,138 @@ def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
     scores = []
     weights = matrix.generate_weights(centroid, pop_size) 
 
+    """introduce td3 here :"""
+    
+    if (epoch > cfg.algorithm.init_cem) : 
+      """Boucle For TD3"""
+      for inner_epoch in range(cfg.algorithm.inner_epochs):
+        batch_size = cfg.algorithm.batch_size
+        replay_workspace = replay_buffer.get(batch_size).to(
+          cfg.algorithm.loss_device
+        )
+        done, reward = replay_workspace["env/done", "env/reward"]
+        train_temporal_q_agent_1(
+          replay_workspace,
+          t=0,
+          n_steps=cfg.algorithm.buffer_time_size,
+          detach_action=True,
+        )
+        q_1 = replay_workspace["q"].squeeze(-1)
+        train_temporal_q_agent_2(
+          replay_workspace,
+          t=0,
+          n_steps=cfg.algorithm.buffer_time_size,
+          detach_action=True,
+        )
+        q_2 = replay_workspace["q"].squeeze(-1)
+
+        with torch.no_grad():
+          train_temporal_action_target_agent(
+            replay_workspace,
+            t=0,
+            n_steps=cfg.algorithm.buffer_time_size,
+            epsilon=cfg.algorithm.target_noise,
+            epsilon_clip=cfg.algorithm.noise_clip,
+          )
+          train_temporal_q_target_agent_1(
+            replay_workspace,
+            t=0,
+            n_steps=cfg.algorithm.buffer_time_size,
+          )
+          q_target_1 = replay_workspace["q"]
+          train_temporal_q_target_agent_2(
+            replay_workspace,
+            t=0,
+            n_steps=cfg.algorithm.buffer_time_size,
+          )
+          q_target_2 = replay_workspace["q"]
+
+        q_target = torch.min(q_target_1, q_target_2).squeeze(-1)
+        target = (
+          reward[1:]
+          + cfg.algorithm.discount_factor
+          * (1.0 - done[1:].float())
+          * q_target[1:]
+        )
+
+        td_1 = q_1[:-1] - target
+        td_2 = q_2[:-1] - target
+        error_1 = td_1 ** 2
+        error_2 = td_2 ** 2
+
+        burning = torch.zeros_like(error_1)
+        burning[cfg.algorithm.burning_timesteps :] = 1.0
+        error_1 = error_1 * burning
+        error_2 = error_2 * burning
+        error = error_1 + error_2
+        loss = error.mean()
+        logger.add_scalar("loss/td_loss_1", error_1.mean().item(), iteration)
+        logger.add_scalar("loss/td_loss_2", error_2.mean().item(), iteration)
+        optimizer_q_1.zero_grad()
+        optimizer_q_2.zero_grad()
+        loss.backward()
+
+        if cfg.algorithm.clip_grad > 0:
+          n = torch.nn.utils.clip_grad_norm_(
+            q_agent_1.parameters(), cfg.algorithm.clip_grad
+          )
+          logger.add_scalar("monitor/grad_norm_q_1", n.item(), iteration)
+          n = torch.nn.utils.clip_grad_norm_(
+            q_agent_2.parameters(), cfg.algorithm.clip_grad
+          )
+          logger.add_scalar("monitor/grad_norm_q_2", n.item(), iteration)
+
+        optimizer_q_1.step()
+        optimizer_q_2.step()
+
+        if inner_epoch % cfg.algorithm.policy_delay:
+          train_temporal_action_agent(
+            replay_workspace,
+              epsilon=0.0,
+              t=0,
+              n_steps=cfg.algorithm.buffer_time_size,
+          )
+          train_temporal_q_agent_1(
+            replay_workspace,
+            t=0,
+            n_steps=cfg.algorithm.buffer_time_size,
+          )
+          q = replay_workspace["q"].squeeze(-1)
+          burning = torch.zeros_like(q)
+          burning[cfg.algorithm.burning_timesteps :] = 1.0
+          q = q * burning
+          q = q * (1.0 - done.float())
+          optimizer_action.zero_grad()
+          loss = -q.mean()
+          td3_loss = loss
+          """loss to use"""
+          loss.backward()
+
+          if cfg.algorithm.clip_grad > 0:
+            n = torch.nn.utils.clip_grad_norm_(
+              action_agent.parameters(), cfg.algorithm.clip_grad
+            )
+            logger.add_scalar("monitor/grad_norm_action", n.item(), iteration)
+
+          logger.add_scalar("loss/q_loss", loss.item(), iteration)
+          optimizer_action.step()
+
+          tau = cfg.algorithm.update_target_tau
+          soft_update_params(q_agent_1, q_target_agent_1, tau)
+          soft_update_params(q_agent_2, q_target_agent_2, tau)
+          soft_update_params(action_agent, action_target_agent, tau)
+
+        iteration += 1
+      
+      if epoch % cfg.algorithm.td3_update_modulo: 
+        """
+        for idx_agent in range(cfg.algorithm.n_processes):
+          set_params(action_agent, temporal_agents[idx_agent].agent.agent.agents[1], tau)
+        """
+        torch.nn.utils.parameters_to_vector(action_agent.parameters(), weights[0])
+        logger.message("TD3 Pop Introduction")
+    
+    #CEM
     position=0
     while(position<pop_size):
       n_to_launch=min(pop_size-position,cfg.algorithm.n_processes)
@@ -253,133 +385,6 @@ def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
         """mettre replay buffer addition ici"""
         
       position+=n_to_launch
-    
-    """Boucle For TD3"""
-    for inner_epoch in range(cfg.algorithm.inner_epochs):
-      batch_size = cfg.algorithm.batch_size
-      replay_workspace = replay_buffer.get(batch_size).to(
-        cfg.algorithm.loss_device
-      )
-      done, reward = replay_workspace["env/done", "env/reward"]
-      train_temporal_q_agent_1(
-        replay_workspace,
-        t=0,
-        n_steps=cfg.algorithm.buffer_time_size,
-        detach_action=True,
-      )
-      q_1 = replay_workspace["q"].squeeze(-1)
-      train_temporal_q_agent_2(
-        replay_workspace,
-        t=0,
-        n_steps=cfg.algorithm.buffer_time_size,
-        detach_action=True,
-      )
-      q_2 = replay_workspace["q"].squeeze(-1)
-
-      with torch.no_grad():
-        train_temporal_action_target_agent(
-          replay_workspace,
-          t=0,
-          n_steps=cfg.algorithm.buffer_time_size,
-          epsilon=cfg.algorithm.target_noise,
-          epsilon_clip=cfg.algorithm.noise_clip,
-        )
-        train_temporal_q_target_agent_1(
-          replay_workspace,
-          t=0,
-          n_steps=cfg.algorithm.buffer_time_size,
-        )
-        q_target_1 = replay_workspace["q"]
-        train_temporal_q_target_agent_2(
-          replay_workspace,
-          t=0,
-          n_steps=cfg.algorithm.buffer_time_size,
-        )
-        q_target_2 = replay_workspace["q"]
-
-      q_target = torch.min(q_target_1, q_target_2).squeeze(-1)
-      target = (
-        reward[1:]
-         + cfg.algorithm.discount_factor
-         * (1.0 - done[1:].float())
-         * q_target[1:]
-      )
-
-      td_1 = q_1[:-1] - target
-      td_2 = q_2[:-1] - target
-      error_1 = td_1 ** 2
-      error_2 = td_2 ** 2
-
-      burning = torch.zeros_like(error_1)
-      burning[cfg.algorithm.burning_timesteps :] = 1.0
-      error_1 = error_1 * burning
-      error_2 = error_2 * burning
-      error = error_1 + error_2
-      loss = error.mean()
-      logger.add_scalar("loss/td_loss_1", error_1.mean().item(), iteration)
-      logger.add_scalar("loss/td_loss_2", error_2.mean().item(), iteration)
-      optimizer_q_1.zero_grad()
-      optimizer_q_2.zero_grad()
-      loss.backward()
-
-      if cfg.algorithm.clip_grad > 0:
-        n = torch.nn.utils.clip_grad_norm_(
-          q_agent_1.parameters(), cfg.algorithm.clip_grad
-        )
-        logger.add_scalar("monitor/grad_norm_q_1", n.item(), iteration)
-        n = torch.nn.utils.clip_grad_norm_(
-          q_agent_2.parameters(), cfg.algorithm.clip_grad
-        )
-        logger.add_scalar("monitor/grad_norm_q_2", n.item(), iteration)
-
-      optimizer_q_1.step()
-      optimizer_q_2.step()
-
-      if inner_epoch % cfg.algorithm.policy_delay:
-        train_temporal_action_agent(
-          replay_workspace,
-            epsilon=0.0,
-            t=0,
-            n_steps=cfg.algorithm.buffer_time_size,
-        )
-        train_temporal_q_agent_1(
-          replay_workspace,
-          t=0,
-          n_steps=cfg.algorithm.buffer_time_size,
-        )
-        q = replay_workspace["q"].squeeze(-1)
-        burning = torch.zeros_like(q)
-        burning[cfg.algorithm.burning_timesteps :] = 1.0
-        q = q * burning
-        q = q * (1.0 - done.float())
-        optimizer_action.zero_grad()
-        loss = -q.mean()
-        td3_loss = loss
-        """loss to use"""
-        loss.backward()
-
-        if cfg.algorithm.clip_grad > 0:
-          n = torch.nn.utils.clip_grad_norm_(
-            action_agent.parameters(), cfg.algorithm.clip_grad
-          )
-          logger.add_scalar("monitor/grad_norm_action", n.item(), iteration)
-
-        logger.add_scalar("loss/q_loss", loss.item(), iteration)
-        optimizer_action.step()
-
-        tau = cfg.algorithm.update_target_tau
-        soft_update_params(q_agent_1, q_target_agent_1, tau)
-        soft_update_params(q_agent_2, q_target_agent_2, tau)
-        soft_update_params(action_agent, action_target_agent, tau)
-
-      iteration += 1
-
-    
-    if epoch % cfg.algorithm.td3_update_modulo: 
-      for idx_agent in range(cfg.algorithm.n_processes):
-        set_params(action_agent, temporal_agents[idx_agent].agent.agent.agents[1], tau)
-      logger.message("TD3 Pop Introduction")
-
 
     print("Best score: ", best_score)
     # Keep only best individuals to compute the new centroid

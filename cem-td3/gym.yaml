@@ -38,6 +38,7 @@ algorithm:
   noise_multiplier: 0.999
   pop_size: 30
   elites_nb: 10
+  init_cem: 5
   td3_update_modulo : 5 
   batch_size: 128
   max_epoch_td3: 10000000
