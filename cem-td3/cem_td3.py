@@ -88,9 +88,13 @@ def soft_update_params(net, target_net, tau):
     for param, target_param in zip(net.parameters(), target_net.parameters()):
         target_param.data.copy_(tau * param.data + (1 - tau) * target_param.data)
 
-def set_params(net, target_net, tau):
+def set_params(net, target_net, hardness, tau=0.005):
+  if hardness == "hard":
     for param, target_param in zip(net.parameters(), target_net.parameters()):
         target_param.data.copy_(param.data)
+  else :
+    soft_update_params(net, target_net, tau)
+
 
 def _state_dict(agent, device):
     sd = agent.state_dict()
@@ -178,20 +182,6 @@ def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
 
   # == Setting up & initializing the replay buffer for DQN
   replay_buffer = ReplayBuffer(cfg.algorithm.buffer_size)
-  # replay_buffer.put(acq_workspace, time_size=cfg.algorithm.buffer_time_size)
-  # """Replay Buffer bien initialise ou pas ?"""
-
-  # logger.message("[DDQN] Initializing replay buffer")
-  # while replay_buffer.size() < cfg.algorithm.initial_buffer_size:
-  #     acq_workspace.copy_n_last_steps(cfg.algorithm.overlapping_timesteps)
-  #     acq_remote_agent(
-  #         acq_workspace,
-  #         t=cfg.algorithm.overlapping_timesteps,
-  #         n_steps=cfg.algorithm.n_timesteps - cfg.algorithm.overlapping_timesteps,
-  #         epsilon=cfg.algorithm.action_noise,
-  #     )
-  #     replay_buffer.put(acq_workspace, time_size=cfg.algorithm.buffer_time_size)
-  # """Initialisation replay buffer jusqu'ici"""
 
   logger.message("[DDQN] Learning")
   n_interactions = 0
@@ -209,22 +199,14 @@ def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
 
   #TD3
 
-
-
-  """TD3 implemente jusqu'ici"""
-
-
-
   # 7) Training loop
   for epoch in range(cfg.algorithm.max_epochs):
     matrix.update_noise()
     scores = []
     weights = matrix.generate_weights(centroid, pop_size) 
-
-    """introduce td3 here :"""
     
+    #td3
     if (epoch > cfg.algorithm.init_cem) : 
-      """Boucle For TD3"""
       for inner_epoch in range(cfg.algorithm.inner_epochs):
         batch_size = cfg.algorithm.batch_size
         replay_workspace = replay_buffer.get(batch_size).to(
@@ -344,22 +326,6 @@ def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
 
         iteration += 1
       
-      # if epoch % cfg.algorithm.td3_update_modulo: 
-      
-      #   #for idx_agent in range(cfg.algorithm.n_processes):
-      #   #set_params(action_agent, temporal_agents[idx_agent].agent.agent.agents[1], tau)
-        
-        
-      #   print("loss td3", td3_loss)
-      #   for pop in range(pop_size // 2):
-      #     # if td3_loss < 0 : 
-      #     #   weights[pop] *= -td3_loss
-      #     # else :
-      #     #   weights[pop] *= td3_loss
-      #     weights[pop] = torch.tensor(action_agent.parameters())
-      #   logger.message("TD3 Pop Introduction")
-      
-    
     #CEM
     position=0
     while(position<pop_size):
@@ -369,8 +335,9 @@ def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
         idx_weight=idx_agent+position
         torch.nn.utils.vector_to_parameters(weights[idx_weight], temporal_agent.parameters())
         temporal_agents[idx_agent].agent.load_state_dict(temporal_agent.state_dict())
+        #pop // 2 <-- td3 actor weights
         if (epoch % cfg.algorithm.td3_update_modulo and epoch > cfg.algorithm.init_cem and position < pop_size // 2 ):
-          soft_update_params(action_agent, temporal_agents[idx_agent].agent.agent.agents[1], tau)
+          set_params(action_agent, temporal_agents[idx_agent].agent.agent.agents[1], cfg.algorithm.cemrl_update_type)
         temporal_agents[idx_agent](t=0,stop_variable="env/done")
       
       #Wait for agents execution
@@ -393,9 +360,8 @@ def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
         if cfg.verbose > 0: 
           print(f"Indiv: {k+position + 1} score {scores[k+position]:.2f}")
         
-
+        #replay buffer update
         replay_buffer.put(workspace, cfg.algorithm.buffer_time_size)
-        """mettre replay buffer addition ici"""
         
       position+=n_to_launch
 
