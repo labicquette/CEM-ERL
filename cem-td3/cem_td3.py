@@ -98,6 +98,9 @@ def _state_dict(agent, device):
         sd[k] = v.to(device)
     return sd
 
+def to_numpy(var):
+    return var.data.numpy()
+
 def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
 
 
@@ -321,8 +324,8 @@ def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
           q = q * (1.0 - done.float())
           optimizer_action.zero_grad()
           loss = -q.mean()
-          td3_loss = loss
           """loss to use"""
+          td3_loss = loss
           loss.backward()
 
           if cfg.algorithm.clip_grad > 0:
@@ -341,13 +344,21 @@ def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
 
         iteration += 1
       
-      if epoch % cfg.algorithm.td3_update_modulo: 
-        """
-        for idx_agent in range(cfg.algorithm.n_processes):
-          set_params(action_agent, temporal_agents[idx_agent].agent.agent.agents[1], tau)
-        """
-        torch.nn.utils.parameters_to_vector(action_agent.parameters(), weights[0])
-        logger.message("TD3 Pop Introduction")
+      # if epoch % cfg.algorithm.td3_update_modulo: 
+      
+      #   #for idx_agent in range(cfg.algorithm.n_processes):
+      #   #set_params(action_agent, temporal_agents[idx_agent].agent.agent.agents[1], tau)
+        
+        
+      #   print("loss td3", td3_loss)
+      #   for pop in range(pop_size // 2):
+      #     # if td3_loss < 0 : 
+      #     #   weights[pop] *= -td3_loss
+      #     # else :
+      #     #   weights[pop] *= td3_loss
+      #     weights[pop] = torch.tensor(action_agent.parameters())
+      #   logger.message("TD3 Pop Introduction")
+      
     
     #CEM
     position=0
@@ -358,6 +369,8 @@ def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
         idx_weight=idx_agent+position
         torch.nn.utils.vector_to_parameters(weights[idx_weight], temporal_agent.parameters())
         temporal_agents[idx_agent].agent.load_state_dict(temporal_agent.state_dict())
+        if (epoch % cfg.algorithm.td3_update_modulo and epoch > cfg.algorithm.init_cem and position < pop_size // 2 ):
+          soft_update_params(action_agent, temporal_agents[idx_agent].agent.agent.agents[1], tau)
         temporal_agents[idx_agent](t=0,stop_variable="env/done")
       
       #Wait for agents execution
