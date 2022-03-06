@@ -28,6 +28,12 @@ import torch.multiprocessing as mp
 
 from agents import QMLPAgent, make_gym_env, ActionMLPAgent
 
+USE_CUDA = torch.cuda.is_available()
+if USE_CUDA :
+  FloatTensor = torch.cuda.FloatTensor
+else:
+  FloatTensor = torch.FloatTensor
+
 
 class ActionAgent(Agent):
     def __init__(self, observation_size, hidden_size1, hidden_size2, action_size):
@@ -107,11 +113,6 @@ def to_numpy(var):
 
 def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
 
-
-
-
-
-
   # 1)  Build the  logger
   torch.manual_seed(cfg.algorithm.env_seed)
   logger = instantiate_class(cfg.logger)
@@ -156,6 +157,7 @@ def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
       n_steps=cfg.algorithm.n_timesteps,
       epsilon=1.0,
   ) 
+ 
   acq_remote_agent.seed(cfg.algorithm.env_seed)
 
   # == Setting up the training agents
@@ -172,6 +174,8 @@ def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
   train_temporal_q_target_agent_1.to(cfg.algorithm.loss_device)
   train_temporal_q_target_agent_2.to(cfg.algorithm.loss_device)
   train_temporal_action_target_agent.to(cfg.algorithm.loss_device)
+
+ 
 
   acq_remote_agent(
     acq_workspace,
@@ -306,8 +310,6 @@ def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
           q = q * (1.0 - done.float())
           optimizer_action.zero_grad()
           loss = -q.mean()
-          """loss to use"""
-          td3_loss = loss
           loss.backward()
 
           if cfg.algorithm.clip_grad > 0:
@@ -352,6 +354,7 @@ def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
         episode_lengths=workspace["env/done"].float().argmax(0)+1
         arange=torch.arange(cfg.algorithm.n_envs) 
         mean_reward=workspace["env/cumulated_reward"][episode_lengths-1,arange].mean().item()
+        
         scores.append(mean_reward)
         if mean_reward >= best_score:
           best_score = mean_reward
@@ -360,9 +363,10 @@ def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
         if cfg.verbose > 0: 
           print(f"Indiv: {k+position + 1} score {scores[k+position]:.2f}")
         
-        #replay buffer update
+        # replay buffer update
         replay_buffer.put(workspace, cfg.algorithm.buffer_time_size)
-        
+      
+      logger.add_scalar("eval/mean_reward", np.mean(scores), iteration)  
       position+=n_to_launch
 
     print("Best score: ", best_score)
@@ -381,7 +385,6 @@ def run_cem_td3(q_agent_1, q_agent_2, action_agent, logger, cfg):
 
 @hydra.main(config_path=".", config_name="gym.yaml")
 def main(cfg):
-    #cfg=OmegaConf.load("gym.yaml")
     mp.set_start_method("spawn")
     logger = instantiate_class(cfg.logger)
     logger.save_hps(cfg)
