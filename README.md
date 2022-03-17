@@ -1,3 +1,7 @@
 # CEM-ERL
-##### Les fichiers contenus dans CEM-ERL/algos/ correspondent a une version modifiee de ERL. 
-##### Les modifications sont faites dans le fichier /CEM-ERL/algos/algos/neuroevolution.py 
+##### cem-td3 : implementation of Aloïs Pourchot's CEM-RL in salina  
+##### cem-erl : CEM-RL variant where a whole RL agent is copied in the population.
+
+##### needed : python > 3.7, salina, gym, hydra
+
+##### run : python cem-td3.py
