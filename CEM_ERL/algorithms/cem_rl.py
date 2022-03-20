@@ -31,7 +31,7 @@ def vector_to_parameters(vec: torch.Tensor, parameters) -> None:
         # Increment the pointer
         pointer += num_param
 
-class CemERl:
+class CemRl:
 
     def __init__(self,cfg) -> None:
 
@@ -95,25 +95,24 @@ class CemERl:
             self.rl_learner.workspace_to_replay_buffer(acq_workspaces)
             if self.rl_learner.replay_buffer.size() < self.initial_buffer_size: # shouldn't access directly to replay buffer 
                 return
-
-            selected_actor =  random.randint(0, self.pop_size)
+            selected_actors = random.sample(range(0,self.pop_size),self.n_rl_agent) # take a half of the population at random
             # n_step_per_actor = n_actor_all_steps//len(selected_actors)
-            
-            logger.debug(f"agent {selected_actor}")
-            agent_id = selected_actor
-            #weight = copy.deepcopy(self.pop_weights[agent_id]) # TODO: check if copy necessary
-            #self.rl_learner.set_actor_params(weight)
+            for i in range(self.n_rl_agent):
+                logger.debug(f"agent {selected_actors[i]}")
+                agent_id = selected_actors[i]
+                weight = copy.deepcopy(self.pop_weights[agent_id]) # TODO: check if copy necessary
+                self.rl_learner.set_actor_params(weight)
 
-            for _ in range(n_actor_all_steps):
-                n_grad =  n_total_actor_steps # TODO: change logging method. 
-                train_workspace =  self.rl_learner.replay_buffer.get(self.rl_learner.cfg.algorithm.batch_size)
-                self.rl_learner.train_critic(train_workspace,n_grad,logger)
+                for _ in range(n_actor_all_steps // len(selected_actors)):
+                    n_grad =  n_total_actor_steps # TODO: change logging method. 
+                    train_workspace =  self.rl_learner.replay_buffer.get(self.rl_learner.cfg.algorithm.batch_size)
+                    self.rl_learner.train_critic(train_workspace,n_grad,logger)
 
-            for _ in range(n_actor_all_steps):
-                n_grad =  n_total_actor_steps
-                train_workspace =  self.rl_learner.replay_buffer.get(self.rl_learner.cfg.algorithm.batch_size)
-                self.rl_learner.train_actor(train_workspace,n_grad,logger)
+                for _ in range(n_actor_all_steps):
+                    n_grad =  n_total_actor_steps
+                    train_workspace =  self.rl_learner.replay_buffer.get(self.rl_learner.cfg.algorithm.batch_size)
+                    self.rl_learner.train_actor(train_workspace,n_grad,logger)
 
                 # send back the updated weight into the population
-            vector_param = torch.nn.utils.parameters_to_vector(self.rl_learner.get_parameters())
-            self.pop_weights[agent_id] = vector_param.clone().detach() # TODO: check if copy necessary
+                vector_param = torch.nn.utils.parameters_to_vector(self.rl_learner.get_parameters())
+                self.pop_weights[agent_id] = vector_param.clone().detach() # TODO: check if copy necessary

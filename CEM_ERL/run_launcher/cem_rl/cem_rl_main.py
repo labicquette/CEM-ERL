@@ -17,7 +17,7 @@ import sys
 import torch 
 sys.path.append(os.getcwd())
 
-from algorithms.cem_erl import CemERl
+from algorithms.cem_rl import CemRl
 HYDRA_FULL_ERROR=1
 
 # TODO: clean remove this function with better env creation
@@ -32,7 +32,7 @@ def make_gym_env(max_episode_steps,env_name,verbose = False):
 
 def synchronized_train_multi(cfg):
     # init 
-    cem_rl = CemERl(cfg)
+    cem_rl = CemRl(cfg)
     logger = instantiate_class(cfg.logger)
 
     n_processes=min(cfg.algorithm.num_processes,cfg.algorithm.es_algorithm.pop_size)
