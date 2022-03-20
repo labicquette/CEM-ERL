@@ -96,7 +96,7 @@ class CemERl:
             if self.rl_learner.replay_buffer.size() < self.initial_buffer_size: # shouldn't access directly to replay buffer 
                 return
 
-            selected_actor =  random.randint(0, self.pop_size)
+            selected_actor =  random.randint(0, self.pop_size-1)
             # n_step_per_actor = n_actor_all_steps//len(selected_actors)
             
             logger.debug(f"agent {selected_actor}")
