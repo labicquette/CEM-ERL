@@ -1,4 +1,5 @@
 import sys,os
+from xml.dom import InvalidModificationErr
 
 import gym
 from gym.wrappers import TimeLimit
@@ -85,10 +86,13 @@ def synchronized_train_multi(cfg):
             creward = cumulated_reward[done]
             agents_creward[i] = creward.mean()
 
+
         logger.add_scalar(f"monitor/n_interactions", n_interactions, n_interactions)
         logger.add_scalar(f"monitor/reward", agents_creward.mean().item(), n_interactions)
         logger.add_scalar(f"monitor/reward_best", agents_creward.max().item(), n_interactions)
-            
+        agents_creward_sorted, indices = agents_creward.data.sort()
+        logger.add_scalar(f"monitor/elites_reward", agents_creward_sorted.data[0:cfg.algorithm.es_algorithm.elites_nb].mean().item(), n_interactions)
+        
         cem_rl.train(acquisition_workspaces,n_interactions,logger)
 
     for a in acquisition_agents:
@@ -99,7 +103,7 @@ def synchronized_train_multi(cfg):
 def debug_train(cfg):
     ''' Train function without multi processing '''
     # init 
-    cem_rl = CemRl(cfg)
+    cem_rl = CemERl(cfg)
     logger = instantiate_class(cfg.logger)
 
     pop_size = cfg.algorithm.es_algorithm.pop_size
