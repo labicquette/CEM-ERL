@@ -37,7 +37,7 @@ algorithm:
       noise_clip : 0.5
       
   learner: 
-    classname: algorithms.cem_rl.cem_rl
+    classname: algorithms.cem_erl.cem_erl
 
   n_rl_agent : 5
   rl_algorithm:
