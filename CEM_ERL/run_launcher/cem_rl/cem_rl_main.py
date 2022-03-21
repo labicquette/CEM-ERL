@@ -40,6 +40,7 @@ def synchronized_train_multi(cfg):
 
     acquisition_agents = []
     acquisition_actors = []
+    print(n_processes)
     for i in range(n_processes): 
         env_agent = env_agent = AutoResetGymAgent(make_gym_env,{'max_episode_steps':cfg.env.max_episode_steps,
                                             'env_name':cfg.env.env_name},
@@ -138,7 +139,7 @@ def debug_train(cfg):
         cem_rl.train(acquisition_workspaces,n_interactions,logger)
 
 
-@hydra.main(config_path=os.path.join(os.getcwd(),'run_launcher/configs/'), config_name="cem_rl_only_td3.yaml")
+@hydra.main(config_path=os.path.join(os.getcwd(),'run_launcher/configs/'), config_name="cem_rl.yaml")
 def main(cfg : DictConfig):
     import torch.multiprocessing as mp
     mp.set_start_method("spawn")

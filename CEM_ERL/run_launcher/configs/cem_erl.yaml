@@ -1,14 +1,14 @@
 algorithm:
   env_seed: 432
-  n_envs: 1
-  num_processes : 2
+  n_envs: 2
+  num_processes : 8
   max_epochs: 10000
 
   batch_size: 128
   discount_factor: 0.995
 
   initial_buffer_size:  10000
-  buffer_size :        100000
+  buffer_size :        1000000
   time_size : 2 # indicates the number of sequential timesteps in replay buffer
 
   action_noise : 0.1

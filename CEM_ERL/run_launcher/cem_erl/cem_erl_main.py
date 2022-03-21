@@ -52,6 +52,7 @@ def synchronized_train_multi(cfg):
         agent=AsynchronousAgent(temporal_agent)
         acquisition_agents.append(agent)
 
+
     n_interactions = 0
     for _ in range(cfg.algorithm.max_epochs):
         acquisition_workspaces = []
@@ -91,9 +92,10 @@ def synchronized_train_multi(cfg):
         logger.add_scalar(f"monitor/reward", agents_creward.mean().item(), n_interactions)
         logger.add_scalar(f"monitor/reward_best", agents_creward.max().item(), n_interactions)
         agents_creward_sorted, indices = agents_creward.data.sort()
-        logger.add_scalar(f"monitor/elites_reward", agents_creward_sorted.data[0:cfg.algorithm.es_algorithm.elites_nb].mean().item(), n_interactions)
+        logger.add_scalar(f"monitor/elites_reward", agents_creward_sorted.data[pop_size - cfg.algorithm.es_algorithm.elites_nb:pop_size].mean().item(), n_interactions)
         
         cem_rl.train(acquisition_workspaces,n_interactions,logger)
+        
 
     for a in acquisition_agents:
         a.close()

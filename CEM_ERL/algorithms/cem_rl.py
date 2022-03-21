@@ -102,7 +102,6 @@ class CemRl:
                 agent_id = selected_actors[i]
                 weight = copy.deepcopy(self.pop_weights[agent_id]) # TODO: check if copy necessary
                 self.rl_learner.set_actor_params(weight)
-
                 for _ in range(n_actor_all_steps // len(selected_actors)):
                     n_grad =  n_total_actor_steps # TODO: change logging method. 
                     train_workspace =  self.rl_learner.replay_buffer.get(self.rl_learner.cfg.algorithm.batch_size)

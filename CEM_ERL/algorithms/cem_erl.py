@@ -63,13 +63,16 @@ class CemERl:
 
     def get_acquisition_actor(self,i) -> Agent:
         actor = self.rl_learner.get_acquisition_actor()
-        weight = copy.deepcopy(self.pop_weights[i]) # TODO: check if necessary
+        #weight = copy.deepcopy(self.pop_weights[i]) # TODO: check if necessary
+        weight = self.pop_weights[i]
+
         vector_to_parameters(weight,self.param_transfert_agent.parameters())
         actor.load_state_dict(self.param_transfert_agent.state_dict())
         return actor
 
     def update_acquisition_actor(self,actor,i) -> None:
-        weight = copy.deepcopy(self.pop_weights[i]) # TODO: check if necessary
+        #weight = copy.deepcopy(self.pop_weights[i]) # TODO: check if necessary
+        weight = self.pop_weights[i]
         vector_to_parameters(weight,self.param_transfert_agent.parameters())        
         actor.load_state_dict(self.param_transfert_agent.state_dict())
 
@@ -103,16 +106,17 @@ class CemERl:
             agent_id = selected_actor
             #weight = copy.deepcopy(self.pop_weights[agent_id]) # TODO: check if copy necessary
             #self.rl_learner.set_actor_params(weight)
-
-            for _ in range(n_actor_all_steps):
+            for _ in range(2*n_actor_all_steps//self.pop_size):
                 n_grad =  n_total_actor_steps # TODO: change logging method. 
                 train_workspace =  self.rl_learner.replay_buffer.get(self.rl_learner.cfg.algorithm.batch_size)
                 self.rl_learner.train_critic(train_workspace,n_grad,logger)
+                
 
             for _ in range(n_actor_all_steps):
                 n_grad =  n_total_actor_steps
                 train_workspace =  self.rl_learner.replay_buffer.get(self.rl_learner.cfg.algorithm.batch_size)
                 self.rl_learner.train_actor(train_workspace,n_grad,logger)
+                
 
                 # send back the updated weight into the population
             vector_param = torch.nn.utils.parameters_to_vector(self.rl_learner.get_parameters())
