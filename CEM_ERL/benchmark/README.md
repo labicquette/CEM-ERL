@@ -2,7 +2,7 @@
 
 ## Pendulum-v1 results 
 
-### First is computed on 500k steps, 2nd is computed on 900k steps, Results are not the same because of random picking of CEM agent in RL agent insertion and hyperparameters different
+### First is computed on 500k steps, 2nd is computed on 900k steps. Results are not the same because of random picking of CEM agent in RL agent insertion and hyperparameters different
 
 Using `CEM_ERL/benchmark/2022-03-20`:
 
