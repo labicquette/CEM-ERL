@@ -4,6 +4,8 @@
 
 ### First is computed on 500k steps, 2nd is computed on 900k steps. Results are not the same because of random picking of CEM agent in RL agent insertion. Hyperparameters different too.
 
+### Approximately 250k steps per hour with 4 cores cpu, 8 processes, 2 envs, 1 000 000 ReplayBuffer size.
+
 Using `CEM_ERL/benchmark/2022-03-20`:
 
 #### elites_reward false, represents lowest part of the population
