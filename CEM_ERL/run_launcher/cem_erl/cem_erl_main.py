@@ -1,4 +1,5 @@
 import sys,os
+from time import time
 from xml.dom import InvalidModificationErr
 
 import gym
@@ -21,6 +22,14 @@ sys.path.append(os.getcwd())
 from algorithms.cem_erl import CemERl
 HYDRA_FULL_ERROR=1
 
+
+USE_CUDA = torch.cuda.is_available()
+USE_CUDA = False
+if USE_CUDA:
+    FloatTensor = torch.cuda.FloatTensor
+else:
+    FloatTensor = torch.FloatTensor
+
 # TODO: clean remove this function with better env creation
 def make_gym_env(max_episode_steps,env_name,verbose = False):
     gym_env = TimeLimit(gym.make(env_name),max_episode_steps=max_episode_steps)
@@ -33,7 +42,15 @@ def make_gym_env(max_episode_steps,env_name,verbose = False):
 
 def synchronized_train_multi(cfg):
     # init 
+    
     cem_rl = CemERl(cfg)
+    if USE_CUDA:
+        cem_rl.rl_learner.action_agent.to("cuda:0")
+        for agent in cem_rl.rl_learner.q_agents:
+            agent.to("cuda:0")
+        cem_rl.rl_learner.target_action_agent.to("cuda:0")
+        for agent in cem_rl.rl_learner.target_q_agents:
+            agent.to("cuda:0")
     logger = instantiate_class(cfg.logger)
 
     n_processes=min(cfg.algorithm.num_processes,cfg.algorithm.es_algorithm.pop_size)
@@ -46,6 +63,9 @@ def synchronized_train_multi(cfg):
                                             'env_name':cfg.env.env_name},
                                             n_envs=cfg.algorithm.n_envs)
         action_agent = cem_rl.get_acquisition_actor(i)
+        if USE_CUDA:
+            env_agent.to("cuda:0")
+            action_agent.to("cuda:0")
         acquisition_actors.append(action_agent)
         temporal_agent=TemporalAgent(Agents(env_agent, action_agent))
         temporal_agent.seed(cfg.algorithm.env_seed)
@@ -55,6 +75,7 @@ def synchronized_train_multi(cfg):
 
     n_interactions = 0
     for _ in range(cfg.algorithm.max_epochs):
+        timing = time()
         acquisition_workspaces = []
         nb_agent_finished = 0
         while(nb_agent_finished < pop_size):
@@ -86,16 +107,19 @@ def synchronized_train_multi(cfg):
             cumulated_reward = acquisition_worspace['env/cumulated_reward']
             creward = cumulated_reward[done]
             agents_creward[i] = creward.mean()
-
-
+        print()
+        print("Temps execution CEM",time() - timing)
+        print()
         logger.add_scalar(f"monitor/n_interactions", n_interactions, n_interactions)
         logger.add_scalar(f"monitor/reward", agents_creward.mean().item(), n_interactions)
         logger.add_scalar(f"monitor/reward_best", agents_creward.max().item(), n_interactions)
         agents_creward_sorted, indices = agents_creward.data.sort()
         logger.add_scalar(f"monitor/elites_reward", agents_creward_sorted.data[pop_size - cfg.algorithm.es_algorithm.elites_nb:pop_size].mean().item(), n_interactions)
-        
+        timing = time()
         cem_rl.train(acquisition_workspaces,n_interactions,logger)
-        
+        print()
+        print("Temps execution td3 :",time() - timing)
+        print()
 
     for a in acquisition_agents:
         a.close()

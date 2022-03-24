@@ -1,6 +1,6 @@
 algorithm:
   env_seed: 432
-  n_envs: 2
+  n_envs: 1
   num_processes : 8
   max_epochs: 10000
 

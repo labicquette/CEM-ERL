@@ -52,8 +52,8 @@ class ddpg(learner):
 
     def set_actor_params(self,weight):
         ''' Overrite the parameters of the actor and the target actor '''
-        vector_to_parameters(weight,self.action_agent.parameters())
-        vector_to_parameters(weight,self.target_action_agent.parameters())
+        vector_to_parameters(weight.detach().clone(),self.action_agent.parameters())
+        vector_to_parameters(weight.detach().clone(),self.target_action_agent.parameters())
         # reset action optimizer: 
         self.optimizer_actor_agent = torch.optim.Adam(self.action_agent.parameters(),lr=self.cfg.algorithm.optimizer.lr)
 
