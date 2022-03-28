@@ -52,6 +52,7 @@ algorithm:
     elites_nb: 5
     diag_cov : True
     active : True
+    steps_es : 5
   # es_algorithm:
   #   classname: ES.sepCEM.SepCEM
   #   sigma_init : 0.001

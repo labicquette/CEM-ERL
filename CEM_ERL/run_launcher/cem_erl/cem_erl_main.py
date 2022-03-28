@@ -45,12 +45,12 @@ def synchronized_train_multi(cfg):
     
     cem_rl = CemERl(cfg)
     if USE_CUDA:
-        cem_rl.rl_learner.action_agent.to("cuda:0")
+        cem_rl.rl_learner.action_agent.to("cuda")
         for agent in cem_rl.rl_learner.q_agents:
-            agent.to("cuda:0")
-        cem_rl.rl_learner.target_action_agent.to("cuda:0")
+            agent.to("cuda")
+        cem_rl.rl_learner.target_action_agent.to("cuda")
         for agent in cem_rl.rl_learner.target_q_agents:
-            agent.to("cuda:0")
+            agent.to("cuda")
     logger = instantiate_class(cfg.logger)
 
     n_processes=min(cfg.algorithm.num_processes,cfg.algorithm.es_algorithm.pop_size)
@@ -64,8 +64,8 @@ def synchronized_train_multi(cfg):
                                             n_envs=cfg.algorithm.n_envs)
         action_agent = cem_rl.get_acquisition_actor(i)
         if USE_CUDA:
-            env_agent.to("cuda:0")
-            action_agent.to("cuda:0")
+            env_agent.to("cuda")
+            action_agent.to("cuda")
         acquisition_actors.append(action_agent)
         temporal_agent=TemporalAgent(Agents(env_agent, action_agent))
         temporal_agent.seed(cfg.algorithm.env_seed)
@@ -74,8 +74,12 @@ def synchronized_train_multi(cfg):
 
 
     n_interactions = 0
-    for _ in range(cfg.algorithm.max_epochs):
+
+    rl_active = cem_rl.rl_active
+
+    for epoch in range(cfg.algorithm.max_epochs):
         timing = time()
+        
         acquisition_workspaces = []
         nb_agent_finished = 0
         while(nb_agent_finished < pop_size):
@@ -107,15 +111,21 @@ def synchronized_train_multi(cfg):
             cumulated_reward = acquisition_worspace['env/cumulated_reward']
             creward = cumulated_reward[done]
             agents_creward[i] = creward.mean()
+
+        
         print()
         print("Temps execution CEM",time() - timing)
         print()
-        logger.add_scalar(f"monitor/n_interactions", n_interactions, n_interactions)
+        logger.add_scalar(f"monitor/n_interactions", n_interactions, epoch)
         logger.add_scalar(f"monitor/reward", agents_creward.mean().item(), n_interactions)
         logger.add_scalar(f"monitor/reward_best", agents_creward.max().item(), n_interactions)
         agents_creward_sorted, indices = agents_creward.data.sort()
         logger.add_scalar(f"monitor/elites_reward", agents_creward_sorted.data[pop_size - cfg.algorithm.es_algorithm.elites_nb:pop_size].mean().item(), n_interactions)
         timing = time()
+
+        if rl_active :
+            cem_rl.rl_activation = epoch % cfg.algorithm.es_algorithm.steps_es == 0
+
         cem_rl.train(acquisition_workspaces,n_interactions,logger)
         print()
         print("Temps execution td3 :",time() - timing)

@@ -19,8 +19,10 @@ class CemERl:
         self.initial_buffer_size = cfg.algorithm.initial_buffer_size
         self.n_rl_agent = cfg.algorithm.n_rl_agent
 
+
         # RL objects:
         self.rl_learner =  get_class(cfg.algorithm.rl_algorithm)(cfg)
+        self.rl_activation = True
 
         # CEM objects
         actor_weights = self.rl_learner.get_acquisition_actor().parameters()
@@ -71,7 +73,8 @@ class CemERl:
             self.rl_learner.workspace_to_replay_buffer(acq_workspaces)
             if self.rl_learner.replay_buffer.size() < self.initial_buffer_size: # shouldn't access directly to replay buffer 
                 return
-
+            if not self.rl_activation:
+                return
             selected_actor =  random.randint(0, self.pop_size-1)
             # n_step_per_actor = n_actor_all_steps//len(selected_actors)
             
