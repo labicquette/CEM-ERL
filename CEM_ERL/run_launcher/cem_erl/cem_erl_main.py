@@ -23,12 +23,6 @@ from algorithms.cem_erl import CemERl
 HYDRA_FULL_ERROR=1
 
 
-USE_CUDA = torch.cuda.is_available()
-USE_CUDA = False
-if USE_CUDA:
-    FloatTensor = torch.cuda.FloatTensor
-else:
-    FloatTensor = torch.FloatTensor
 
 # TODO: clean remove this function with better env creation
 def make_gym_env(max_episode_steps,env_name,verbose = False):
@@ -44,13 +38,6 @@ def synchronized_train_multi(cfg):
     # init 
     
     cem_rl = CemERl(cfg)
-    if USE_CUDA:
-        cem_rl.rl_learner.action_agent.to("cuda")
-        for agent in cem_rl.rl_learner.q_agents:
-            agent.to("cuda")
-        cem_rl.rl_learner.target_action_agent.to("cuda")
-        for agent in cem_rl.rl_learner.target_q_agents:
-            agent.to("cuda")
     logger = instantiate_class(cfg.logger)
 
     n_processes=min(cfg.algorithm.num_processes,cfg.algorithm.es_algorithm.pop_size)
@@ -63,9 +50,6 @@ def synchronized_train_multi(cfg):
                                             'env_name':cfg.env.env_name},
                                             n_envs=cfg.algorithm.n_envs)
         action_agent = cem_rl.get_acquisition_actor(i)
-        if USE_CUDA:
-            env_agent.to("cuda")
-            action_agent.to("cuda")
         acquisition_actors.append(action_agent)
         temporal_agent=TemporalAgent(Agents(env_agent, action_agent))
         temporal_agent.seed(cfg.algorithm.env_seed)
