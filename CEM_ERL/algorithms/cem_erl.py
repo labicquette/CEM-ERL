@@ -1,7 +1,7 @@
 import torch
 from salina import instantiate_class,get_class
 import random 
-from torch.nn.utils import parameters_to_vector, vector_to_parameters
+from torch.nn.utils.convert_parameters import parameters_to_vector, vector_to_parameters
 from salina import Agent
 
 import copy
@@ -26,7 +26,7 @@ class CemERl:
 
         # CEM objects
         actor_weights = self.rl_learner.get_acquisition_actor().parameters()
-        self.centroid = copy.deepcopy(parameters_to_vector(actor_weights).detach())
+        self.centroid = copy.deepcopy(parameters_to_vector(actor_weights).detach().to(cfg.algorithm.device))
         code_args = {'num_params': len(self.centroid),'mu_init':self.centroid}
         kwargs = {**cfg.algorithm.es_algorithm, **code_args}
         self.es_learner = get_class(cfg.algorithm.es_algorithm)(**kwargs)
@@ -96,4 +96,4 @@ class CemERl:
 
                 # send back the updated weight into the population
             vector_param = torch.nn.utils.parameters_to_vector(self.rl_learner.get_parameters())
-            self.pop_weights[agent_id] = vector_param.detach() 
+            self.pop_weights[agent_id] = vector_param.detach().to('cuda')

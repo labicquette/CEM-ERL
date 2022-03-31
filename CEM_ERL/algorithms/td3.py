@@ -16,18 +16,22 @@ class td3(ddpg):
 
         self.cfg = cfg
         
+        self.device = cfg.algorithm.device
+        if self.device == 'cuda':
+            assert torch.cuda.is_available()
+
         obs_dim,action_dim,max_action = get_env_dimensions(self.cfg.env)
         self.n_q_agents = 2
-            # create agents
+        # create agents
         common_nn_args = {'state_dim':obs_dim,'action_dim':action_dim,'max_action':max_action}
         # To merge dict_a and dict_b in one line you can write :  {**dict_a,**dict_b}
         nn_args= {**dict(cfg.algorithm.action_agent),**common_nn_args}
-        self.action_agent =  get_class(cfg.algorithm.action_agent)(**nn_args)
+        self.action_agent =  get_class(cfg.algorithm.action_agent)(**nn_args).to(self.device)
         if not isinstance(self.action_agent,Agent):
             self.action_agent = Salina_Actor_Decorator(self.action_agent)
 
         nn_args= {**dict(cfg.algorithm.q_agent),**common_nn_args}        
-        self.q_agents = [get_class(cfg.algorithm.q_agent)(**nn_args) for _ in range(self.n_q_agents)]
+        self.q_agents = [get_class(cfg.algorithm.q_agent)(**nn_args).to(self.device) for _ in range(self.n_q_agents)]
         for i,_ in enumerate(self.q_agents):
             if not isinstance(self.q_agents[i],Agent):
                 self.q_agents[i] = Salina_Qcritic_Decorator(self.q_agents[i])
@@ -46,7 +50,7 @@ class td3(ddpg):
         # create optimizers
         self.create_optimizers()
 
-        self.replay_buffer = ReplayBuffer(self.cfg.algorithm.buffer_size)
+        self.replay_buffer = ReplayBuffer(self.cfg.algorithm.buffer_size, device=self.device)
 
     def create_optimizers(self):
         self.optimizer_actor_agent = torch.optim.Adam(self.action_agent.parameters(),lr=self.cfg.algorithm.optimizer.lr)
@@ -66,7 +70,7 @@ class td3(ddpg):
 
     def train_critic(self,train_workspace,step_id,logger):
         done, reward = train_workspace["env/done", "env/reward"]
-            
+        train_workspace = train_workspace.to(self.device)
         # Train the critic : 
         ## Compute q(s,a) into the workspace: 
         q_values =[]

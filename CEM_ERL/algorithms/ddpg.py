@@ -4,7 +4,7 @@ from salina import Agent,instantiate_class,get_class
 from salina.agents import TemporalAgent
 from salina.rl.replay_buffer import ReplayBuffer
 from collections.abc import Iterable
-from torch.nn.utils import parameters_to_vector,vector_to_parameters
+from torch.nn.utils.convert_parameters import parameters_to_vector,vector_to_parameters
 
 import torch
 
@@ -17,7 +17,11 @@ class ddpg(learner):
     def __init__(self,cfg) -> None:
 
         self.cfg=cfg
-        
+        self.device = cfg.algorithm.device
+        if self.device == 'cuda':
+            assert torch.cuda.is_available()
+
+
         obs_dim,action_dim,max_action = get_env_dimensions(self.cfg.env)
         # create agents
         common_nn_args = {'state_dim':obs_dim,'action_dim':action_dim,'max_action':max_action}
@@ -36,10 +40,10 @@ class ddpg(learner):
         self.target_action_agent = copy.deepcopy(self.action_agent)
 
         # create temporal agents
-        self.t_action_agent = TemporalAgent(self.action_agent)
-        self.t_target_action_agent = TemporalAgent(self.target_action_agent)
-        self.t_q_agent = TemporalAgent(self.q_agent)
-        self.t_target_q_agent = TemporalAgent(self.target_q_agent)
+        self.t_action_agent = TemporalAgent(self.action_agent).to(self.device)
+        self.t_target_action_agent = TemporalAgent(self.target_action_agent).to(self.device)
+        self.t_q_agent = TemporalAgent(self.q_agent).to(self.device)
+        self.t_target_q_agent = TemporalAgent(self.target_q_agent).to(self.device)
 
         # create optimizers
         self.create_optimizers()
@@ -52,8 +56,8 @@ class ddpg(learner):
 
     def set_actor_params(self,weight):
         ''' Overrite the parameters of the actor and the target actor '''
-        vector_to_parameters(weight.detach().clone(),self.action_agent.parameters())
-        vector_to_parameters(weight.detach().clone(),self.target_action_agent.parameters())
+        vector_to_parameters(weight.detach().clone().to('cuda'),self.action_agent.parameters())
+        vector_to_parameters(weight.detach().clone().to('cuda'),self.target_action_agent.parameters())
         # reset action optimizer: 
         self.optimizer_actor_agent = torch.optim.Adam(self.action_agent.parameters(),lr=self.cfg.algorithm.optimizer.lr)
 
@@ -97,10 +101,12 @@ class ddpg(learner):
         for i in range(n_actor_steps):
             grad_step_id = n_total_actor_steps-n_actor_steps+i
             train_workspace =  self.replay_buffer.get(self.cfg.algorithm.batch_size)
+            train_workspace = train_workspace.to(self.device)
             self.train_critic(train_workspace,grad_step_id,logger)
             self.train_actor(train_workspace,grad_step_id,logger)
 
     def train_critic(self,train_workspace,n_interactions,logger):
+        train_workspace = train_workspace.to(self.device)
         done, reward = train_workspace["env/done", "env/reward"]
             
         # Train the critic : 
@@ -130,7 +136,8 @@ class ddpg(learner):
 
     def train_actor(self,train_workspace,n_interactions,logger):
         # Compute q(s,pi(s)) into the workspace: 
-                
+        train_workspace = train_workspace.to(self.device)
+
         self.t_action_agent(train_workspace,t=0,n_steps=self.cfg.algorithm.time_size)
         self.t_q_agent(train_workspace,t=0,n_steps=self.cfg.algorithm.time_size) # TODO : strange using algorithm.time_size, is like having double batch_size.
         target_q_value = train_workspace['q_value']
