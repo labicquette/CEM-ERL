@@ -101,9 +101,9 @@ def synchronized_train_multi(cfg):
         logger.add_scalar(f"monitor/elites_reward", elites.mean().item(), n_interactions)
         
         if 0 in indices[pop_size - cfg.algorithm.es_algorithm.elites_nb:pop_size]:
-            logger.add_scalar(f"monitor/rl_learner_selection", 1)
+            logger.add_scalar(f"monitor/rl_learner_selection", 1, n_interactions)
         else: 
-            logger.add_scalar(f"monitor/rl_learner_selection", 0)
+            logger.add_scalar(f"monitor/rl_learner_selection", 0, n_interactions)
         
         timing = time()
 
