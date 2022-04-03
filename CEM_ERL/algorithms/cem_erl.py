@@ -3,8 +3,10 @@ from salina import instantiate_class,get_class
 import random 
 from torch.nn.utils.convert_parameters import parameters_to_vector, vector_to_parameters
 from salina import Agent
-
+import tqdm
 import copy
+
+from time import time
 
 class CemERl:
 
@@ -81,12 +83,29 @@ class CemERl:
             if not self.rl_activation:
                 return
             
-            for _ in range(n_actor_all_steps):
+            temps_workspace = 0
+            temps_learner = 0
+            temps_total1 = 0
+            temps_total2 = 0
+            for _ in tqdm.tqdm(range(n_actor_all_steps),desc="Critic"):
                 n_grad =  n_total_actor_steps # TODO: change logging method. 
-                train_workspace =  self.rl_learner.replay_buffer.get(self.rl_learner.cfg.algorithm.batch_size)
-                self.rl_learner.train_critic(train_workspace,n_grad,logger)
                 
-            for _ in range(n_actor_all_steps//2):
+                temps = time()
+                train_workspace =  self.rl_learner.replay_buffer.get(self.rl_learner.cfg.algorithm.batch_size)
+                temps_workspace += time() - temps
+
+                temps = time()
+                temps1, temps2 = self.rl_learner.train_critic(train_workspace,n_grad,logger)
+                temps_total1 += temps1
+                temps_total2 += temps2
+                temps_learner += time() - temps
+            
+            print("temps workspace", temps_workspace)
+            print("temps learner", temps_learner)
+            print("temps1",temps_total1)
+            print("temps2",temps_total2)
+
+            for _ in tqdm.tqdm(range(n_actor_all_steps//2),desc="Actor"):
                 n_grad =  n_total_actor_steps
                 train_workspace =  self.rl_learner.replay_buffer.get(self.rl_learner.cfg.algorithm.batch_size)
                 self.rl_learner.train_actor(train_workspace,n_grad,logger)

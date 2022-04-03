@@ -39,17 +39,17 @@ def synchronized_train_multi(cfg):
 
     acquisition_agents = []
     acquisition_actors = []
+
     for i in range(n_processes): 
         env_agent = AutoResetGymAgent(make_gym_env,{'max_episode_steps':cfg.env.max_episode_steps,
                                             'env_name':cfg.env.env_name},
                                             n_envs=cfg.algorithm.n_envs)
-        action_agent = cem_erl.get_acquisition_actor(i)
+        action_agent = cem_erl.get_acquisition_actor(i).to(cfg.algorithm.es_algorithm.device)
         acquisition_actors.append(action_agent)
         temporal_agent = TemporalAgent(Agents(env_agent, action_agent))
         temporal_agent.seed(cfg.algorithm.env_seed)
         agent = AsynchronousAgent(temporal_agent)
         acquisition_agents.append(agent)
-
 
     n_interactions = 0
 
@@ -57,7 +57,6 @@ def synchronized_train_multi(cfg):
 
     for epoch in tqdm.tqdm(range(cfg.algorithm.max_epochs)):
         timing = time()
-        
         acquisition_workspaces = []
         nb_agent_finished = 0
         while(nb_agent_finished < pop_size):
@@ -65,7 +64,6 @@ def synchronized_train_multi(cfg):
             for idx_agent in range(n_to_launch):        
                 idx_weight = idx_agent + nb_agent_finished
                 cem_erl.update_acquisition_actor(acquisition_actors[idx_agent],idx_weight)
-                
                 # TODO: add noise args to agents interaction with env ? Alois does not. 
                 acquisition_agents[idx_agent](t=0,stop_variable="env/done")
 
@@ -74,9 +72,9 @@ def synchronized_train_multi(cfg):
             while running:
                 are_running = [a.is_running() for a in acquisition_agents[:n_to_launch]]
                 running = any(are_running)
+
             nb_agent_finished += n_to_launch
             acquisition_workspaces += [a.get_workspace() for a in acquisition_agents[:n_to_launch]]
-    
         ## Logging rewards:
         for acquisition_worspace in acquisition_workspaces:
             n_interactions += (
@@ -100,7 +98,7 @@ def synchronized_train_multi(cfg):
         elites = agents_creward_sorted.data[pop_size - cfg.algorithm.es_algorithm.elites_nb:pop_size]        
         logger.add_scalar(f"monitor/elites_reward", elites.mean().item(), n_interactions)
         
-        if 0 in indices[pop_size - cfg.algorithm.es_algorithm.elites_nb:pop_size]:
+        if 0 in indices[pop_size - cfg.algorithm.es_algorithm.elites_nb:pop_size] and epoch % cfg.algorithm.es_algorithm.steps_es == 0:
             logger.add_scalar(f"monitor/rl_learner_selection", 1, n_interactions)
         else: 
             logger.add_scalar(f"monitor/rl_learner_selection", 0, n_interactions)

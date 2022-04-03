@@ -34,9 +34,9 @@ class Q_Agent(Agent):
             activation=nn.ReLU)
     def forward(self,t,detach_actions=False, **kwargs):
         obs = self.get(('env/env_obs',t))
+        action = self.get(('action',t))
         if detach_actions :
             action = action.detach()
-        action = self.get(('action',t))
         input = torch.cat((obs,action),dim=1)
         q_value = self.model(input)
         self.set(('q_value',t),q_value)

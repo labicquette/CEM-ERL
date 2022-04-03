@@ -10,6 +10,7 @@ import copy
 import torch
 from models.utils import Salina_Actor_Decorator,Salina_Qcritic_Decorator
 
+from time import time
 
 class td3(ddpg):
     def __init__(self,cfg) -> None:
@@ -70,11 +71,12 @@ class td3(ddpg):
 
     def train_critic(self,train_workspace,step_id,logger):
         done, reward = train_workspace["env/done", "env/reward"]
-        train_workspace = train_workspace.to(self.device)
+
         # Train the critic : 
         ## Compute q(s,a) into the workspace: 
         q_values =[]
         target_q_values = []
+        temps1 = time()
         for i in range(self.n_q_agents): # Compute Q(s,a) for each critics
             self.t_q_agents[i](train_workspace,t=0,detach_action=True,n_steps=self.cfg.algorithm.time_size)
             q_values.append(train_workspace['q_value'].squeeze(-1))
@@ -85,6 +87,9 @@ class td3(ddpg):
                                         epsilon = self.cfg.algorithm.action_noise) # TD3 : adding noise
                 target_q_values.append(train_workspace['q_value'])
         target_q_value = torch.min(*target_q_values).squeeze(-1) # TD3 : the target is the mean of two critics
+
+        temps1 = time() - temps1
+        temps2 = time()
 
         for i in range(self.n_q_agents): # TD3, two critics are trained with the same data
             q_value = q_values[i]
@@ -101,3 +106,5 @@ class td3(ddpg):
             self.optimizer_q_agent[i].step()
     
             soft_param_update(self.target_q_agents[i],self.q_agents[i],self.cfg.algorithm.update_target_rho)
+
+        return temps1, time() - temps2

@@ -1,9 +1,9 @@
 algorithm:
   env_seed: 432
-  n_envs: 1
-  num_processes : 1
+  n_envs: 2
+  num_processes : 8
   max_epochs: 10000
-  batch_size: 128
+  batch_size: 256
   discount_factor: 0.995
 
   initial_buffer_size:  10000
@@ -37,7 +37,7 @@ algorithm:
       
   learner: 
     classname: algorithms.cem_erl.cem_erl
-    device: cpu
+    device: cuda
 
   n_rl_agent : 5
   rl_algorithm:
