@@ -22,6 +22,9 @@ def to_numpy(var):
     return var.cpu().data.numpy() if USE_CUDA else var.data.numpy()
 
 
+hidden1_dim = 40
+hidden2_dim = 30
+
 
 class RLNN(nn.Module):
 
@@ -93,13 +96,13 @@ class Actor(RLNN):
     def __init__(self, state_dim, action_dim, max_action, layer_norm=False, init=True,**kwargs):
         super(Actor, self).__init__(state_dim, action_dim, max_action)
         
-        self.l1 = nn.Linear(state_dim, 400)
-        self.l2 = nn.Linear(400, 300)
-        self.l3 = nn.Linear(300, action_dim)
+        self.l1 = nn.Linear(state_dim, hidden1_dim)
+        self.l2 = nn.Linear(hidden1_dim, hidden2_dim)
+        self.l3 = nn.Linear(hidden2_dim, action_dim)
 
         if layer_norm:
-            self.n1 = nn.LayerNorm(400)
-            self.n2 = nn.LayerNorm(300)
+            self.n1 = nn.LayerNorm(hidden1_dim)
+            self.n2 = nn.LayerNorm(hidden2_dim)
         self.layer_norm = layer_norm
 
     def forward(self, x):
@@ -121,13 +124,13 @@ class Critic(RLNN):
     def __init__(self, state_dim, action_dim, layer_norm=False,**kwargs):
         super(Critic, self).__init__(state_dim, action_dim, 1)
 
-        self.l1 = nn.Linear(state_dim + action_dim, 400)
-        self.l2 = nn.Linear(400, 300)
-        self.l3 = nn.Linear(300, 1)
+        self.l1 = nn.Linear(state_dim + action_dim, hidden1_dim)
+        self.l2 = nn.Linear(hidden1_dim, hidden2_dim)
+        self.l3 = nn.Linear(hidden2_dim, 1)
 
         if layer_norm:
-            self.n1 = nn.LayerNorm(400)
-            self.n2 = nn.LayerNorm(300)
+            self.n1 = nn.LayerNorm(hidden1_dim)
+            self.n2 = nn.LayerNorm(hidden2_dim)
         self.layer_norm = layer_norm
 
     def forward(self, x, u):
@@ -150,22 +153,22 @@ class CriticTD3(RLNN):
         super(CriticTD3, self).__init__(state_dim, action_dim, 1)
 
         # Q1 architecture
-        self.l1 = nn.Linear(state_dim + action_dim, 400)
-        self.l2 = nn.Linear(400, 300)
-        self.l3 = nn.Linear(300, 1)
+        self.l1 = nn.Linear(state_dim + action_dim, hidden1_dim)
+        self.l2 = nn.Linear(hidden1_dim, hidden2_dim)
+        self.l3 = nn.Linear(hidden2_dim, 1)
 
         if layer_norm:
-            self.n1 = nn.LayerNorm(400)
-            self.n2 = nn.LayerNorm(300)
+            self.n1 = nn.LayerNorm(hidden1_dim)
+            self.n2 = nn.LayerNorm(hidden2_dim)
 
         # Q2 architecture
-        self.l4 = nn.Linear(state_dim + action_dim, 400)
-        self.l5 = nn.Linear(400, 300)
-        self.l6 = nn.Linear(300, 1)
+        self.l4 = nn.Linear(state_dim + action_dim, hidden1_dim)
+        self.l5 = nn.Linear(hidden1_dim, hidden2_dim)
+        self.l6 = nn.Linear(hidden2_dim, 1)
 
         if layer_norm:
-            self.n4 = nn.LayerNorm(400)
-            self.n5 = nn.LayerNorm(300)
+            self.n4 = nn.LayerNorm(hidden1_dim)
+            self.n5 = nn.LayerNorm(hidden2_dim)
         self.layer_norm = layer_norm
 
     def forward(self, x, u):
@@ -197,13 +200,13 @@ class Actor(RLNN):
     def __init__(self, state_dim, action_dim, max_action, args,**kwargs):
         super(Actor, self).__init__(state_dim, action_dim, max_action)
 
-        self.l1 = nn.Linear(state_dim, 400)
-        self.l2 = nn.Linear(400, 300)
-        self.l3 = nn.Linear(300, action_dim)
+        self.l1 = nn.Linear(state_dim, hidden1_dim)
+        self.l2 = nn.Linear(hidden1_dim, hidden2_dim)
+        self.l3 = nn.Linear(hidden2_dim, action_dim)
 
         if args.layer_norm:
-            self.n1 = nn.LayerNorm(400)
-            self.n2 = nn.LayerNorm(300)
+            self.n1 = nn.LayerNorm(hidden1_dim)
+            self.n2 = nn.LayerNorm(hidden2_dim)
         self.layer_norm = args.layer_norm
 
         # self.optimizer = torch.optim.Adam(self.parameters(), lr=args.actor_lr)
@@ -253,13 +256,13 @@ class Critic(RLNN):
     def __init__(self, state_dim, action_dim, max_action, args,**kwargs):
         super(Critic, self).__init__(state_dim, action_dim, 1)
 
-        self.l1 = nn.Linear(state_dim + action_dim, 400)
-        self.l2 = nn.Linear(400, 300)
-        self.l3 = nn.Linear(300, 1)
+        self.l1 = nn.Linear(state_dim + action_dim, hidden1_dim)
+        self.l2 = nn.Linear(hidden1_dim, hidden2_dim)
+        self.l3 = nn.Linear(hidden2_dim, 1)
 
         if args.layer_norm:
-            self.n1 = nn.LayerNorm(400)
-            self.n2 = nn.LayerNorm(300)
+            self.n1 = nn.LayerNorm(hidden1_dim)
+            self.n2 = nn.LayerNorm(hidden2_dim)
 
         self.layer_norm = args.layer_norm
         # self.optimizer = torch.optim.Adam(self.parameters(), lr=args.critic_lr)
@@ -315,22 +318,22 @@ class CriticTD3(RLNN):
         super(CriticTD3, self).__init__(state_dim, action_dim, 1)
 
         # Q1 architecture
-        self.l1 = nn.Linear(state_dim + action_dim, 400)
-        self.l2 = nn.Linear(400, 300)
-        self.l3 = nn.Linear(300, 1)
+        self.l1 = nn.Linear(state_dim + action_dim, hidden1_dim)
+        self.l2 = nn.Linear(hidden1_dim, hidden2_dim)
+        self.l3 = nn.Linear(hidden2_dim, 1)
 
         if args.layer_norm:
-            self.n1 = nn.LayerNorm(400)
-            self.n2 = nn.LayerNorm(300)
+            self.n1 = nn.LayerNorm(hidden1_dim)
+            self.n2 = nn.LayerNorm(hidden2_dim)
 
         # Q2 architecture
-        self.l4 = nn.Linear(state_dim + action_dim, 400)
-        self.l5 = nn.Linear(400, 300)
-        self.l6 = nn.Linear(300, 1)
+        self.l4 = nn.Linear(state_dim + action_dim, hidden1_dim)
+        self.l5 = nn.Linear(hidden1_dim, hidden2_dim)
+        self.l6 = nn.Linear(hidden2_dim, 1)
 
         if args.layer_norm:
-            self.n4 = nn.LayerNorm(400)
-            self.n5 = nn.LayerNorm(300)
+            self.n4 = nn.LayerNorm(hidden1_dim)
+            self.n5 = nn.LayerNorm(hidden2_dim)
 
         self.layer_norm = args.layer_norm
         # self.optimizer = torch.optim.Adam(self.parameters(), lr=args.critic_lr)

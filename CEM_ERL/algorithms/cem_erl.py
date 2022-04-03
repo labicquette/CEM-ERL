@@ -19,6 +19,11 @@ class CemERl:
         self.initial_buffer_size = cfg.algorithm.initial_buffer_size
         self.n_rl_agent = cfg.algorithm.n_rl_agent
 
+        # device
+        self.es_device = cfg.algorithm.es_algorithm.device
+        self.rl_device = cfg.algorithm.learner.device
+        if self.es_device == 'cuda' or self.rl_device == 'cuda':
+            assert torch.cuda.is_available(), 'Cuda is not available'
 
         # RL objects:
         self.rl_learner =  get_class(cfg.algorithm.rl_algorithm)(cfg)
@@ -26,7 +31,7 @@ class CemERl:
 
         # CEM objects
         actor_weights = self.rl_learner.get_acquisition_actor().parameters()
-        self.centroid = copy.deepcopy(parameters_to_vector(actor_weights).detach().to(cfg.algorithm.device))
+        self.centroid = copy.deepcopy(parameters_to_vector(actor_weights).detach().to(self.es_device))
         code_args = {'num_params': len(self.centroid),'mu_init':self.centroid}
         kwargs = {**cfg.algorithm.es_algorithm, **code_args}
         self.es_learner = get_class(cfg.algorithm.es_algorithm)(**kwargs)
@@ -75,25 +80,17 @@ class CemERl:
                 return
             if not self.rl_activation:
                 return
-            selected_actor =  random.randint(0, self.pop_size-1)
-            # n_step_per_actor = n_actor_all_steps//len(selected_actors)
             
-            agent_id = selected_actor
-            # not used in CEM_ERL
-            #weight = copy.deepcopy(self.pop_weights[agent_id]) 
-            #self.rl_learner.set_actor_params(weight)
             for _ in range(n_actor_all_steps):
                 n_grad =  n_total_actor_steps # TODO: change logging method. 
                 train_workspace =  self.rl_learner.replay_buffer.get(self.rl_learner.cfg.algorithm.batch_size)
                 self.rl_learner.train_critic(train_workspace,n_grad,logger)
                 
-
             for _ in range(n_actor_all_steps//2):
                 n_grad =  n_total_actor_steps
                 train_workspace =  self.rl_learner.replay_buffer.get(self.rl_learner.cfg.algorithm.batch_size)
                 self.rl_learner.train_actor(train_workspace,n_grad,logger)
                 
-
-                # send back the updated weight into the population
+            # send back the updated weight into the population
             vector_param = torch.nn.utils.parameters_to_vector(self.rl_learner.get_parameters())
-            self.pop_weights[agent_id] = vector_param.detach().to('cuda')
+            self.pop_weights[0] = vector_param.detach().to(self.es_device)

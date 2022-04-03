@@ -16,7 +16,7 @@ class td3(ddpg):
 
         self.cfg = cfg
         
-        self.device = cfg.algorithm.device
+        self.device = cfg.algorithm.learner.device
         if self.device == 'cuda':
             assert torch.cuda.is_available()
 

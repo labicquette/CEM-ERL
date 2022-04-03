@@ -21,8 +21,6 @@ from algorithms.cem_erl import CemERl
 HYDRA_FULL_ERROR=1
 
 
-
-# TODO: clean remove this function with better env creation
 def make_gym_env(max_episode_steps,env_name,verbose = False):
     gym_env = TimeLimit(gym.make(env_name),max_episode_steps=max_episode_steps)
     if verbose:
@@ -30,15 +28,13 @@ def make_gym_env(max_episode_steps,env_name,verbose = False):
     return gym_env
 
 
-
-
 def synchronized_train_multi(cfg):
     # init 
     
-    cem_rl = CemERl(cfg)
+    cem_erl = CemERl(cfg)
     logger = instantiate_class(cfg.logger)
 
-    n_processes=min(cfg.algorithm.num_processes,cfg.algorithm.es_algorithm.pop_size)
+    n_processes = min(cfg.algorithm.num_processes,cfg.algorithm.es_algorithm.pop_size)
     pop_size = cfg.algorithm.es_algorithm.pop_size
 
     acquisition_agents = []
@@ -47,17 +43,17 @@ def synchronized_train_multi(cfg):
         env_agent = AutoResetGymAgent(make_gym_env,{'max_episode_steps':cfg.env.max_episode_steps,
                                             'env_name':cfg.env.env_name},
                                             n_envs=cfg.algorithm.n_envs)
-        action_agent = cem_rl.get_acquisition_actor(i)
+        action_agent = cem_erl.get_acquisition_actor(i)
         acquisition_actors.append(action_agent)
-        temporal_agent=TemporalAgent(Agents(env_agent, action_agent))
+        temporal_agent = TemporalAgent(Agents(env_agent, action_agent))
         temporal_agent.seed(cfg.algorithm.env_seed)
-        agent=AsynchronousAgent(temporal_agent)
+        agent = AsynchronousAgent(temporal_agent)
         acquisition_agents.append(agent)
 
 
     n_interactions = 0
 
-    rl_active = cem_rl.rl_active
+    rl_active = cem_erl.rl_active
 
     for epoch in tqdm.tqdm(range(cfg.algorithm.max_epochs)):
         timing = time()
@@ -68,7 +64,7 @@ def synchronized_train_multi(cfg):
             n_to_launch = min(pop_size-nb_agent_finished, n_processes)
             for idx_agent in range(n_to_launch):        
                 idx_weight = idx_agent + nb_agent_finished
-                cem_rl.update_acquisition_actor(acquisition_actors[idx_agent],idx_weight)
+                cem_erl.update_acquisition_actor(acquisition_actors[idx_agent],idx_weight)
                 
                 # TODO: add noise args to agents interaction with env ? Alois does not. 
                 acquisition_agents[idx_agent](t=0,stop_variable="env/done")
@@ -93,71 +89,33 @@ def synchronized_train_multi(cfg):
             cumulated_reward = acquisition_worspace['env/cumulated_reward']
             creward = cumulated_reward[done]
             agents_creward[i] = creward.mean()
-
         
-        print()
-        print("Temps execution CEM",time() - timing)
-        print()
+        print(f"/nTemps execution CEM {time() - timing}/n")
+
         logger.add_scalar(f"monitor/n_interactions", n_interactions, epoch)
         logger.add_scalar(f"monitor/reward", agents_creward.mean().item(), n_interactions)
         logger.add_scalar(f"monitor/reward_best", agents_creward.max().item(), n_interactions)
+
         agents_creward_sorted, indices = agents_creward.data.sort()
-        logger.add_scalar(f"monitor/elites_reward", agents_creward_sorted.data[pop_size - cfg.algorithm.es_algorithm.elites_nb:pop_size].mean().item(), n_interactions)
+        elites = agents_creward_sorted.data[pop_size - cfg.algorithm.es_algorithm.elites_nb:pop_size]        
+        logger.add_scalar(f"monitor/elites_reward", elites.mean().item(), n_interactions)
+        
+        if 0 in indices[pop_size - cfg.algorithm.es_algorithm.elites_nb:pop_size]:
+            logger.add_scalar(f"monitor/rl_learner_selection", 1)
+        else: 
+            logger.add_scalar(f"monitor/rl_learner_selection", 0)
+        
         timing = time()
 
         if rl_active :
-            cem_rl.rl_activation = epoch % cfg.algorithm.es_algorithm.steps_es == 0
+            cem_erl.rl_activation = epoch % cfg.algorithm.es_algorithm.steps_es == 0
 
-        cem_rl.train(acquisition_workspaces,n_interactions,logger)
-        print()
-        print("Temps execution td3 :",time() - timing)
-        print()
+        cem_erl.train(acquisition_workspaces,n_interactions,logger)
+        
+        print(f"/nTemps execution TD3 {time() - timing}/n")
 
     for a in acquisition_agents:
         a.close()
-
-
-
-def debug_train(cfg):
-    ''' Train function without multi processing '''
-    # init 
-    cem_rl = CemERl(cfg)
-    logger = instantiate_class(cfg.logger)
-
-    pop_size = cfg.algorithm.es_algorithm.pop_size
-    env_agent = env_agent = AutoResetGymAgent(make_gym_env,{'max_episode_steps':cfg.env.max_episode_steps,
-                                        'env_name':cfg.env.env_name},
-                                        n_envs=cfg.algorithm.n_envs//cfg.algorithm.num_processes)
-    acquisition_actor = cem_rl.get_acquisition_actor(0)
-    acquisition_agent = TemporalAgent(Agents(env_agent, acquisition_actor))
-    acquisition_agent.seed(cfg.algorithm.env_seed)
-
-    n_interactions = 0
-    for _ in tqdm.tqdm(range(cfg.algorithm.max_epochs)):
-        acquisition_workspaces = []
-        for i in range(pop_size):
-            workspace = Workspace()
-            cem_rl.update_acquisition_actor(acquisition_actor,i)
-            acquisition_agent(workspace,t=0,stop_variable="env/done")
-            acquisition_workspaces.append(workspace)
-        ## Logging rewards:
-        for acquisition_worspace in acquisition_workspaces:
-            n_interactions += (
-                acquisition_worspace.time_size() - 1
-            ) * acquisition_worspace.batch_size()
-
-        agents_creward = torch.zeros(len(acquisition_workspaces))
-        for i,acquisition_worspace in enumerate(acquisition_workspaces):
-            done = acquisition_worspace['env/done']
-            cumulated_reward = acquisition_worspace['env/cumulated_reward']
-            creward = cumulated_reward[done]
-            agents_creward[i] = creward.mean()
-
-        logger.add_scalar(f"monitor/n_interactions", n_interactions, n_interactions)
-        logger.add_scalar(f"monitor/reward", agents_creward.mean().item(), n_interactions)
-        logger.add_scalar(f"monitor/reward_best", agents_creward.max().item(), n_interactions)
-            
-        cem_rl.train(acquisition_workspaces,n_interactions,logger)
 
 
 @hydra.main(config_path=os.path.join(os.getcwd(),'run_launcher/configs/'), config_name="cem_erl.yaml")

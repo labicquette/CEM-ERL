@@ -17,10 +17,9 @@ class ddpg(learner):
     def __init__(self,cfg) -> None:
 
         self.cfg=cfg
-        self.device = cfg.algorithm.device
+        self.device = cfg.algorithm.learner.device
         if self.device == 'cuda':
             assert torch.cuda.is_available()
-
 
         obs_dim,action_dim,max_action = get_env_dimensions(self.cfg.env)
         # create agents
@@ -56,8 +55,8 @@ class ddpg(learner):
 
     def set_actor_params(self,weight):
         ''' Overrite the parameters of the actor and the target actor '''
-        vector_to_parameters(weight.detach().clone().to('cuda'),self.action_agent.parameters())
-        vector_to_parameters(weight.detach().clone().to('cuda'),self.target_action_agent.parameters())
+        vector_to_parameters(weight.detach().clone().to(self.device),self.action_agent.parameters())
+        vector_to_parameters(weight.detach().clone().to(self.device),self.target_action_agent.parameters())
         # reset action optimizer: 
         self.optimizer_actor_agent = torch.optim.Adam(self.action_agent.parameters(),lr=self.cfg.algorithm.optimizer.lr)
 
@@ -84,9 +83,9 @@ class ddpg(learner):
             or a list of acquisition workspaces'''
         if isinstance(acq_worspace, Iterable):
             for workspace in acq_worspace:
-                self.replay_buffer.put(workspace,time_size=self.cfg.algorithm.time_size)
+                self.replay_buffer.put(workspace.to(self.device),time_size=self.cfg.algorithm.time_size)
         else: 
-            self.replay_buffer.put(acq_worspace,time_size=self.cfg.algorithm.time_size)
+            self.replay_buffer.put(acq_worspace.to(self.device),time_size=self.cfg.algorithm.time_size)
         
     def train(self,acq_workspace,n_actor_steps,n_total_actor_steps,logger):
 
