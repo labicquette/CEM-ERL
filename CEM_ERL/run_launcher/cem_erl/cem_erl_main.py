@@ -1,25 +1,23 @@
-import sys,os
-from time import time
-from xml.dom import InvalidModificationErr
-
+import sys
+import os
 import gym
+import hydra
+import torch
+import tqdm
 from gym.wrappers import TimeLimit
 from omegaconf import DictConfig
-
 from salina import instantiate_class,Workspace
 from salina.agents import Agents,TemporalAgent,NRemoteAgent
 from salina.agents.gyma import AutoResetGymAgent
 from salina.agents.gyma import NoAutoResetGymAgent, GymAgent
 from salina.logger import TFLogger
 from salina.agents.asynchronous import AsynchronousAgent
-import hydra
+from time import time
+from xml.dom import InvalidModificationErr
 
-import sys
-
-import torch 
 sys.path.append(os.getcwd())
-
 from algorithms.cem_erl import CemERl
+
 HYDRA_FULL_ERROR=1
 
 
@@ -61,7 +59,7 @@ def synchronized_train_multi(cfg):
 
     rl_active = cem_rl.rl_active
 
-    for epoch in range(cfg.algorithm.max_epochs):
+    for epoch in tqdm.tqdm(range(cfg.algorithm.max_epochs)):
         timing = time()
         
         acquisition_workspaces = []
@@ -135,7 +133,7 @@ def debug_train(cfg):
     acquisition_agent.seed(cfg.algorithm.env_seed)
 
     n_interactions = 0
-    for _ in range(cfg.algorithm.max_epochs):
+    for _ in tqdm.tqdm(range(cfg.algorithm.max_epochs)):
         acquisition_workspaces = []
         for i in range(pop_size):
             workspace = Workspace()
@@ -170,6 +168,4 @@ def main(cfg : DictConfig):
     # debug_train(cfg)
 
 if __name__=='__main__':
-    # print(os.getcwd())
-    # sys.path.append(os.getcwd())
     main()
