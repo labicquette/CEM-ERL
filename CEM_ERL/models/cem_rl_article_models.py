@@ -22,8 +22,8 @@ def to_numpy(var):
     return var.cpu().data.numpy() if USE_CUDA else var.data.numpy()
 
 
-hidden1_dim = 40
-hidden2_dim = 30
+hidden1_dim = 400
+hidden2_dim = 300
 
 
 class RLNN(nn.Module):

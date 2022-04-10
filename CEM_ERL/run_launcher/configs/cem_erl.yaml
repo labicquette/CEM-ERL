@@ -1,13 +1,13 @@
 algorithm:
   env_seed: 432
-  n_envs: 2
+  n_envs: 1
   num_processes : 8
   max_epochs: 10000
-  batch_size: 256
+  batch_size: 128
   discount_factor: 0.995
 
   initial_buffer_size:  10000
-  buffer_size :        1000000
+  buffer_size :        100000
   time_size : 2 # indicates the number of sequential timesteps in replay buffer
 
   action_noise : 0.1
@@ -42,18 +42,19 @@ algorithm:
   n_rl_agent : 5
   rl_algorithm:
     classname: algorithms.td3.td3
-    active : True
+    active : False
 
   es_algorithm:
     classname: ES.cov_matrix.CEM
     device: cpu
-    sigma : 0.2
-    noise_multiplier: 0.999
-    pop_size:  20
-    elites_nb: 5
+    sigma : 0.001
+    noise_multiplier: 0.8
+    noise_limit: 0.8
+    pop_size:  10
+    elites_nb: 3
     diag_cov : True
     active : True
-    steps_es : 5
+    steps_es : 1000000
   # es_algorithm:
   #   classname: ES.sepCEM.SepCEM
   #   sigma_init : 0.001

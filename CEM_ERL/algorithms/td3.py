@@ -76,35 +76,51 @@ class td3(ddpg):
         ## Compute q(s,a) into the workspace: 
         q_values =[]
         target_q_values = []
-        temps1 = time()
         for i in range(self.n_q_agents): # Compute Q(s,a) for each critics
             self.t_q_agents[i](train_workspace,t=0,detach_action=True,n_steps=self.cfg.algorithm.time_size)
             q_values.append(train_workspace['q_value'].squeeze(-1))
         self.t_target_action_agent(train_workspace,t=0,n_steps=self.cfg.algorithm.time_size) # replace action by \pi_target(s)
+        
+        
         for i in range(self.n_q_agents): # Compute Q(s',\pi_target(a)) for each critics
             with torch.no_grad():
                 self.t_target_q_agents[i](train_workspace,t=0,n_steps=self.cfg.algorithm.time_size,
                                         epsilon = self.cfg.algorithm.action_noise) # TD3 : adding noise
                 target_q_values.append(train_workspace['q_value'])
         target_q_value = torch.min(*target_q_values).squeeze(-1) # TD3 : the target is the mean of two critics
+        
+        
+        
 
-        temps1 = time() - temps1
-        temps2 = time()
 
         for i in range(self.n_q_agents): # TD3, two critics are trained with the same data
+            
+            
             q_value = q_values[i]
             target = reward[1:] + self.cfg.algorithm.discount_factor * target_q_value[1:]*(~done[1:])
             td_error = (target - q_value[:-1])
             critic_loss = torch.mean(td_error**2)
+
+            
             logger.add_scalar("loss/critic_loss", critic_loss.mean().item(), step_id)
             
+            
+            
+            
             self.optimizer_q_agent[i].zero_grad()
+            
+
+
+            
             critic_loss.backward()
+            
             if self.cfg.algorithm.clip_grad !=None:
                 n= torch.nn.utils.clip_grad_norm_(self.q_agents[i].parameters(), self.cfg.algorithm.clip_grad)
                 logger.add_scalar("monitor/grad_norm_q_critic", n.item(), step_id)
+            
+            
+            
             self.optimizer_q_agent[i].step()
-    
+            
+            
             soft_param_update(self.target_q_agents[i],self.q_agents[i],self.cfg.algorithm.update_target_rho)
-
-        return temps1, time() - temps2

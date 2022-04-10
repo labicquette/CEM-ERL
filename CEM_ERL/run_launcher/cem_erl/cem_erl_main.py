@@ -4,6 +4,7 @@ import gym
 import hydra
 import torch
 import tqdm
+#import my_gym
 from gym.wrappers import TimeLimit
 from omegaconf import DictConfig
 from salina import instantiate_class,Workspace
@@ -17,6 +18,7 @@ from xml.dom import InvalidModificationErr
 
 sys.path.append(os.getcwd())
 from algorithms.cem_erl import CemERl
+
 
 HYDRA_FULL_ERROR=1
 
