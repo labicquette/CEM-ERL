@@ -1,8 +1,8 @@
 algorithm:
-  env_seed: 432
+  env_seed: 436
   n_envs: 1
   num_processes : 8
-  max_epochs: 10000
+  max_epochs: 333
   batch_size: 128
   discount_factor: 0.995
 
@@ -49,8 +49,8 @@ algorithm:
     device: cpu
     sigma : 0.001
     noise_multiplier: 0.8
-    noise_limit: 0.8
-    pop_size:  10
+    #noise_limit: 0.8
+    pop_size:  15
     elites_nb: 3
     diag_cov : True
     active : True

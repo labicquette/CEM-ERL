@@ -2,10 +2,10 @@ import torch
 import numpy
 class CovMatrix(): # TODO: Verify convergence with diag
   #
-    def __init__(self, centroid: torch.Tensor, sigma, noise_multiplier, noise_limit,diag_cov=False,**kwargs):
+    def __init__(self, centroid: torch.Tensor, sigma, noise_multiplier, diag_cov=False,**kwargs):
         self.diag_cov = diag_cov
         policy_dim = centroid.size()[0]
-        self.noise_limit = noise_limit
+        #self.noise_limit = noise_limit
         
         if self.diag_cov:
           self.cov = sigma *torch.ones(policy_dim)
@@ -17,8 +17,8 @@ class CovMatrix(): # TODO: Verify convergence with diag
         self.noise_multiplier = noise_multiplier
 
     def update_noise(self) -> None:
-        self.noise = self.noise * self.noise_multiplier + (1-self.noise_multiplier) * self.noise_limit
-
+        #self.noise = self.noise * self.noise_multiplier + (1-self.noise_multiplier) * self.noise_limit
+        self.noise = self.noise * self.noise_multiplier
     def generate_weights(self, centroid, pop_size):
 
       if self.diag_cov:
