@@ -59,7 +59,7 @@ algorithm:
 
 env:
   classname: utils.make_gym_env
-  env_name: CartPole-v1
+  env_name: CartPoleContinious-v1
   max_episode_steps:  200
 
 logger:

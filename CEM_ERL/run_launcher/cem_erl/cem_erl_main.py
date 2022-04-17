@@ -2,6 +2,7 @@ import sys
 import os
 import gym
 import hydra
+import my_gym
 import torch
 import tqdm
 from gym.wrappers import TimeLimit

@@ -1,6 +1,7 @@
 import sys,os
 
 import gym
+import my_gym
 from gym.wrappers import TimeLimit
 from omegaconf import DictConfig
 
