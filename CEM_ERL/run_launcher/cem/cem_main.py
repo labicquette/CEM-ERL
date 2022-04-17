@@ -4,7 +4,7 @@ import gym
 import hydra
 import torch
 import tqdm
-import my_gym
+#import my_gym
 from gym.wrappers import TimeLimit
 from omegaconf import DictConfig
 from salina import instantiate_class,Workspace
@@ -17,7 +17,7 @@ from time import time
 from xml.dom import InvalidModificationErr
 
 sys.path.append(os.getcwd())
-from algorithms.cem_erl import CemERl
+from algorithms.cem import Cem
 
 
 HYDRA_FULL_ERROR=1
@@ -33,7 +33,7 @@ def make_gym_env(max_episode_steps,env_name,verbose = False):
 def synchronized_train_multi(cfg):
     # init 
     
-    cem_erl = CemERl(cfg)
+    cem = Cem(cfg)
     logger = instantiate_class(cfg.logger)
 
     n_processes = min(cfg.algorithm.num_processes,cfg.algorithm.es_algorithm.pop_size)
@@ -46,7 +46,7 @@ def synchronized_train_multi(cfg):
         env_agent = AutoResetGymAgent(make_gym_env,{'max_episode_steps':cfg.env.max_episode_steps,
                                             'env_name':cfg.env.env_name},
                                             n_envs=cfg.algorithm.n_envs)
-        action_agent = cem_erl.get_acquisition_actor(i).to(cfg.algorithm.es_algorithm.device)
+        action_agent = cem.get_acquisition_actor(i).to(cfg.algorithm.es_algorithm.device)
         acquisition_actors.append(action_agent)
         temporal_agent = TemporalAgent(Agents(env_agent, action_agent))
         temporal_agent.seed(cfg.algorithm.env_seed)
@@ -55,17 +55,20 @@ def synchronized_train_multi(cfg):
 
     n_interactions = 0
 
-    rl_active = cem_erl.rl_active
+    rl_active = cem.rl_active
 
     for epoch in tqdm.tqdm(range(cfg.algorithm.max_epochs)):
         timing = time()
         acquisition_workspaces = []
         nb_agent_finished = 0
+
+        
+        nb_agent_finished = 0
         while(nb_agent_finished < pop_size):
             n_to_launch = min(pop_size-nb_agent_finished, n_processes)
             for idx_agent in range(n_to_launch):        
                 idx_weight = idx_agent + nb_agent_finished
-                cem_erl.update_acquisition_actor(acquisition_actors[idx_agent],idx_weight)
+                cem.update_acquisition_actor(acquisition_actors[idx_agent],idx_weight)
                 # TODO: add noise args to agents interaction with env ? Alois does not. 
                 acquisition_agents[idx_agent](t=0,stop_variable="env/done")
 
@@ -76,13 +79,10 @@ def synchronized_train_multi(cfg):
                 running = any(are_running)
 
             nb_agent_finished += n_to_launch
-            acquisition_workspaces += [a.get_workspace() for a in acquisition_agents[:n_to_launch]]
+            acquisition_workspaces += [a.get_workspace() for a in acquisition_agents[:n_to_launch]]        
         ## Logging rewards:
         for acquisition_worspace in acquisition_workspaces:
-            n_interactions += (
-                acquisition_worspace.time_size() - 1
-            ) * acquisition_worspace.batch_size()
-
+            n_interactions += acquisition_worspace.time_size() - 1
         agents_creward = torch.zeros(len(acquisition_workspaces))
         for i,acquisition_worspace in enumerate(acquisition_workspaces):
             done = acquisition_worspace['env/done']
@@ -108,9 +108,9 @@ def synchronized_train_multi(cfg):
         timing = time()
 
         if rl_active :
-            cem_erl.rl_activation = epoch % cfg.algorithm.es_algorithm.steps_es == 0
+            cem.rl_activation = epoch % cfg.algorithm.es_algorithm.steps_es == 0
 
-        cem_erl.train(acquisition_workspaces,n_interactions,logger)
+        cem.train(acquisition_workspaces, agents_creward, n_interactions,logger)
         
         print(f"/nTemps execution TD3 {time() - timing}/n")
 
@@ -118,7 +118,7 @@ def synchronized_train_multi(cfg):
         a.close()
 
 
-@hydra.main(config_path=os.path.join(os.getcwd(),'run_launcher/configs/'), config_name="cem_erl.yaml")
+@hydra.main(config_path=os.path.join(os.getcwd(),'run_launcher/configs/'), config_name="cem.yaml")
 def main(cfg : DictConfig):
     import torch.multiprocessing as mp
     mp.set_start_method("spawn")

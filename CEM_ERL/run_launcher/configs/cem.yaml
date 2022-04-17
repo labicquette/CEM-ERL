@@ -37,7 +37,7 @@ algorithm:
       
   learner: 
     classname: algorithms.cem_erl.cem_erl
-    device: cuda
+    device: cpu
 
   n_rl_agent : 5
   rl_algorithm:
@@ -47,14 +47,15 @@ algorithm:
   es_algorithm:
     classname: ES.cov_matrix.CEM
     device: cpu
-    sigma : 0.001
+    sigma : 0.5
     noise_multiplier: 0.8
     #noise_limit: 0.8
-    pop_size:  15
+    pop_size:  20
     elites_nb: 3
     diag_cov : True
     active : True
     steps_es : 1000000
+    nb_eval : 10
   # es_algorithm:
   #   classname: ES.sepCEM.SepCEM
   #   sigma_init : 0.001
