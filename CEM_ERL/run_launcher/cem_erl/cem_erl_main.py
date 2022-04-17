@@ -4,7 +4,6 @@ import gym
 import hydra
 import torch
 import tqdm
-import my_gym
 from gym.wrappers import TimeLimit
 from omegaconf import DictConfig
 from salina import instantiate_class,Workspace
