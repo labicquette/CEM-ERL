@@ -58,18 +58,14 @@ class CemERl:
         vector_to_parameters(weight,self.param_transfert_agent.parameters())        
         actor.load_state_dict(self.param_transfert_agent.state_dict())
 
-    def train(self,acq_workspaces,n_total_actor_steps,logger) -> None:
+    def train(self,acq_workspaces,fitness,n_total_actor_steps,logger) -> None:
 
         # Compute fitness of population
         n_actor_all_steps = 0
-        fitness = torch.zeros(len(acq_workspaces))
         for i,workspace in enumerate(acq_workspaces):
-            n_actor_all_steps += (
-                workspace.time_size() - 1
-            ) * workspace.batch_size()
-            done = workspace['env/done']
-            cumulated_reward = workspace['env/cumulated_reward']
-            fitness[i] = cumulated_reward[done].mean()
+            n_actor_all_steps += workspace.time_size() - 1
+            
+            
         
         if self.es_active:
             self.es_learner.tell(self.pop_weights,fitness) #  Update CEM

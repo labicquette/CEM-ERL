@@ -14,7 +14,7 @@ from salina.agents.gyma import NoAutoResetGymAgent, GymAgent
 from salina.logger import TFLogger
 from salina.agents.asynchronous import AsynchronousAgent
 from time import time
-from xml.dom import InvalidModificationErr
+
 
 sys.path.append(os.getcwd())
 from algorithms.cem_erl import CemERl
@@ -43,9 +43,9 @@ def synchronized_train_multi(cfg):
     acquisition_actors = []
 
     for i in range(n_processes): 
-        env_agent = AutoResetGymAgent(make_gym_env,{'max_episode_steps':cfg.env.max_episode_steps,
+        env_agent = NoAutoResetGymAgent(make_gym_env,{'max_episode_steps':cfg.env.max_episode_steps,
                                             'env_name':cfg.env.env_name},
-                                            n_envs=cfg.algorithm.n_envs)
+                                            n_envs=cfg.algorithm.n_envs).to(cfg.algorithm.es_algorithm.device)
         action_agent = cem_erl.get_acquisition_actor(i).to(cfg.algorithm.es_algorithm.device)
         acquisition_actors.append(action_agent)
         temporal_agent = TemporalAgent(Agents(env_agent, action_agent))
@@ -79,9 +79,8 @@ def synchronized_train_multi(cfg):
             acquisition_workspaces += [a.get_workspace() for a in acquisition_agents[:n_to_launch]]
         ## Logging rewards:
         for acquisition_worspace in acquisition_workspaces:
-            n_interactions += (
-                acquisition_worspace.time_size() - 1
-            ) * acquisition_worspace.batch_size()
+            n_interactions += acquisition_worspace.time_size() - 1
+            
 
         agents_creward = torch.zeros(len(acquisition_workspaces))
         for i,acquisition_worspace in enumerate(acquisition_workspaces):
@@ -110,7 +109,7 @@ def synchronized_train_multi(cfg):
         if rl_active :
             cem_erl.rl_activation = epoch % cfg.algorithm.es_algorithm.steps_es == 0
 
-        cem_erl.train(acquisition_workspaces,n_interactions,logger)
+        cem_erl.train(acquisition_workspaces, agents_creward ,n_interactions,logger)
         
         print(f"/nTemps execution TD3 {time() - timing}/n")
 

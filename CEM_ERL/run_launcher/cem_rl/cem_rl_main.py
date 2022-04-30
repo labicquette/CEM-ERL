@@ -43,7 +43,7 @@ def synchronized_train_multi(cfg):
     acquisition_actors = []
     print(n_processes)
     for i in range(n_processes): 
-        env_agent = env_agent = AutoResetGymAgent(make_gym_env,{'max_episode_steps':cfg.env.max_episode_steps,
+        env_agent = env_agent = NoAutoResetGymAgent(make_gym_env,{'max_episode_steps':cfg.env.max_episode_steps,
                                             'env_name':cfg.env.env_name},
                                             n_envs=cfg.algorithm.n_envs)
         action_agent = cem_rl.get_acquisition_actor(i)

@@ -14,7 +14,6 @@ from salina.agents.gyma import NoAutoResetGymAgent, GymAgent
 from salina.logger import TFLogger
 from salina.agents.asynchronous import AsynchronousAgent
 from time import time
-from xml.dom import InvalidModificationErr
 
 sys.path.append(os.getcwd())
 from algorithms.cem import Cem
@@ -43,9 +42,9 @@ def synchronized_train_multi(cfg):
     acquisition_actors = []
 
     for i in range(n_processes): 
-        env_agent = AutoResetGymAgent(make_gym_env,{'max_episode_steps':cfg.env.max_episode_steps,
+        env_agent = NoAutoResetGymAgent(make_gym_env,{'max_episode_steps':cfg.env.max_episode_steps,
                                             'env_name':cfg.env.env_name},
-                                            n_envs=cfg.algorithm.n_envs)
+                                            n_envs=cfg.algorithm.n_envs).to(cfg.algorithm.es_algorithm.device)
         action_agent = cem.get_acquisition_actor(i).to(cfg.algorithm.es_algorithm.device)
         acquisition_actors.append(action_agent)
         temporal_agent = TemporalAgent(Agents(env_agent, action_agent))
@@ -60,9 +59,6 @@ def synchronized_train_multi(cfg):
     for epoch in tqdm.tqdm(range(cfg.algorithm.max_epochs)):
         timing = time()
         acquisition_workspaces = []
-        nb_agent_finished = 0
-
-        
         nb_agent_finished = 0
         while(nb_agent_finished < pop_size):
             n_to_launch = min(pop_size-nb_agent_finished, n_processes)
@@ -80,6 +76,8 @@ def synchronized_train_multi(cfg):
 
             nb_agent_finished += n_to_launch
             acquisition_workspaces += [a.get_workspace() for a in acquisition_agents[:n_to_launch]]        
+       
+       
         ## Logging rewards:
         for acquisition_worspace in acquisition_workspaces:
             n_interactions += acquisition_worspace.time_size() - 1
@@ -87,6 +85,7 @@ def synchronized_train_multi(cfg):
         for i,acquisition_worspace in enumerate(acquisition_workspaces):
             done = acquisition_worspace['env/done']
             cumulated_reward = acquisition_worspace['env/cumulated_reward']
+            #print("creward:",len(cumulated_reward))
             creward = cumulated_reward[done]
             agents_creward[i] = creward.mean()
         
