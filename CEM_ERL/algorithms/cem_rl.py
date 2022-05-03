@@ -81,7 +81,7 @@ class CemRl:
         for i,workspace in enumerate(acq_workspaces):
             n_actor_all_steps += (
                 workspace.time_size() - 1
-            ) * workspace.batch_size()
+            ) 
             done = workspace['env/done']
             cumulated_reward = workspace['env/cumulated_reward']
             fitness[i] = cumulated_reward[done].mean()

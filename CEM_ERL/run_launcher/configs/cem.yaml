@@ -1,8 +1,9 @@
 algorithm:
-  env_seed: 432
+  env_seed: 522
   n_envs: 5
   num_processes : 8
-  max_epochs: 333
+  max_epochs: 1000
+  max_steps : 500000
   batch_size: 128
   discount_factor: 0.995
 
@@ -14,6 +15,11 @@ algorithm:
   update_target_rho: 0.005
   clip_grad: 2
   policy_delay : 2
+
+
+
+  data :
+    path :outputs/cem/run1
 
   # action_agent:
   #   classname: models.salina_models.DeterministicAgent
@@ -54,8 +60,7 @@ algorithm:
     elites_nb: 3
     diag_cov : True
     active : True
-    steps_es : 1000000
-    nb_eval : 1
+    steps_es: 1
   # es_algorithm:
   #   classname: ES.sepCEM.SepCEM
   #   sigma_init : 0.001
@@ -71,9 +76,17 @@ algorithm:
     classname: torch.optim.Adam
     lr: 0.001
 
+  
+
+data :
+  logger_interval : 5000
+  path : run1.csv
+
+
 env:
   classname: utils.make_gym_env
-  env_name: CartPoleContinuous-v1
+  #env_name: CartPoleContinuous-v1
+  env_name: Pendulum-v1
   max_episode_steps:  200
 
 logger:

@@ -1,7 +1,7 @@
 import sys,os
 
 import gym
-import my_gym
+#import my_gym
 from gym.wrappers import TimeLimit
 from omegaconf import DictConfig
 
@@ -55,6 +55,8 @@ def synchronized_train_multi(cfg):
 
     n_interactions = 0
     for _ in range(cfg.algorithm.max_epochs):
+        if(n_interactions > cfg.algorithm.max_steps):
+            break
         acquisition_workspaces = []
         nb_agent_finished = 0
         while(nb_agent_finished < pop_size):
@@ -78,7 +80,7 @@ def synchronized_train_multi(cfg):
         for acquisition_worspace in acquisition_workspaces:
             n_interactions += (
                 acquisition_worspace.time_size() - 1
-            ) * acquisition_worspace.batch_size()
+            ) 
 
         agents_creward = torch.zeros(len(acquisition_workspaces))
         for i,acquisition_worspace in enumerate(acquisition_workspaces):
@@ -91,6 +93,11 @@ def synchronized_train_multi(cfg):
         logger.add_scalar(f"monitor/reward", agents_creward.mean().item(), n_interactions)
         logger.add_scalar(f"monitor/reward_best", agents_creward.max().item(), n_interactions)
             
+        agents_creward_sorted, indices = agents_creward.data.sort()
+        elites = agents_creward_sorted.data[pop_size - cfg.algorithm.es_algorithm.elites_nb:pop_size]        
+        logger.add_scalar(f"monitor/elites_reward", elites.mean().item(), n_interactions)
+        
+
         cem_rl.train(acquisition_workspaces,n_interactions,logger)
 
     for a in acquisition_agents:

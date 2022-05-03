@@ -2,7 +2,8 @@ import sys
 import os
 import gym
 import hydra
-import my_gym
+#import my_gym
+import csv
 import torch
 import tqdm
 from gym.wrappers import TimeLimit
@@ -37,6 +38,7 @@ def synchronized_train_multi(cfg):
 
     n_processes = min(cfg.algorithm.num_processes,cfg.algorithm.es_algorithm.pop_size)
     pop_size = cfg.algorithm.es_algorithm.pop_size
+    tmp_steps = 0
 
     acquisition_agents = []
     acquisition_actors = []
@@ -57,6 +59,8 @@ def synchronized_train_multi(cfg):
     rl_active = cem.rl_active
 
     for epoch in tqdm.tqdm(range(cfg.algorithm.max_epochs)):
+        if(n_interactions > cfg.algorithm.max_steps):
+            break
         timing = time()
         acquisition_workspaces = []
         nb_agent_finished = 0
@@ -105,6 +109,16 @@ def synchronized_train_multi(cfg):
             logger.add_scalar(f"monitor/rl_learner_selection", 0, n_interactions)
         
         timing = time()
+
+        if(n_interactions - tmp_steps > cfg.data.logger_interval):
+            tmp_steps = n_interactions
+            with open(os.path.join(os.getcwd(),cfg.data.path), "w", newline='') as f:
+                writer = csv.writer(f)
+                # csv file : steps,  reward, best reward, reward elite
+                writer.writerow([n_interactions, 
+                                agents_creward.mean().item(),
+                                agents_creward.max().item(),
+                                elites.mean().item()])
 
         if rl_active :
             cem.rl_activation = epoch % cfg.algorithm.es_algorithm.steps_es == 0
