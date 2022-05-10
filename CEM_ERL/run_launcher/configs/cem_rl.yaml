@@ -1,3 +1,8 @@
+data :
+  logger_interval : 5000
+  path : cem_rl_pendulum-v1_run10.csv
+
+
 algorithm:
   env_seed: 522
   n_envs: 5
@@ -69,6 +74,7 @@ algorithm:
   optimizer:
     classname: torch.optim.Adam
     lr: 0.001
+
 
 env:
   classname: utils.make_gym_env

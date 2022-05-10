@@ -12,7 +12,7 @@ from salina.agents.gyma import NoAutoResetGymAgent, GymAgent
 from salina.logger import TFLogger
 from salina.agents.asynchronous import AsynchronousAgent
 import hydra
-
+import csv
 import sys
 
 import torch 
@@ -35,6 +35,7 @@ def synchronized_train_multi(cfg):
     # init 
     cem_rl = CemRl(cfg)
     logger = instantiate_class(cfg.logger)
+    tmp_steps = 0
 
     n_processes=min(cfg.algorithm.num_processes,cfg.algorithm.es_algorithm.pop_size)
     pop_size = cfg.algorithm.es_algorithm.pop_size
@@ -97,6 +98,16 @@ def synchronized_train_multi(cfg):
         elites = agents_creward_sorted.data[pop_size - cfg.algorithm.es_algorithm.elites_nb:pop_size]        
         logger.add_scalar(f"monitor/elites_reward", elites.mean().item(), n_interactions)
         
+        if(n_interactions - tmp_steps > cfg.data.logger_interval):
+            tmp_steps += cfg.data.logger_interval
+            with open(os.path.join(os.getcwd(),cfg.data.path), "a+", newline='') as f:
+                writer = csv.writer(f)
+                # csv file : steps,  reward, best reward, reward elite
+                writer.writerow([tmp_steps, 
+                                agents_creward.mean().item(),
+                                agents_creward.max().item(),
+                                elites.mean().item()])
+            
 
         cem_rl.train(acquisition_workspaces,n_interactions,logger)
 
@@ -105,46 +116,7 @@ def synchronized_train_multi(cfg):
 
 
 
-def debug_train(cfg):
-    ''' Train function without multi processing '''
-    # init 
-    cem_rl = CemRl(cfg)
-    logger = instantiate_class(cfg.logger)
 
-    pop_size = cfg.algorithm.es_algorithm.pop_size
-    env_agent = env_agent = AutoResetGymAgent(make_gym_env,{'max_episode_steps':cfg.env.max_episode_steps,
-                                        'env_name':cfg.env.env_name},
-                                        n_envs=cfg.algorithm.n_envs//cfg.algorithm.num_processes)
-    acquisition_actor = cem_rl.get_acquisition_actor(0)
-    acquisition_agent = TemporalAgent(Agents(env_agent, acquisition_actor))
-    acquisition_agent.seed(cfg.algorithm.env_seed)
-
-    n_interactions = 0
-    for _ in range(cfg.algorithm.max_epochs):
-        acquisition_workspaces = []
-        for i in range(pop_size):
-            workspace = Workspace()
-            cem_rl.update_acquisition_actor(acquisition_actor,i)
-            acquisition_agent(workspace,t=0,stop_variable="env/done")
-            acquisition_workspaces.append(workspace)
-        ## Logging rewards:
-        for acquisition_worspace in acquisition_workspaces:
-            n_interactions += (
-                acquisition_worspace.time_size() - 1
-            ) * acquisition_worspace.batch_size()
-
-        agents_creward = torch.zeros(len(acquisition_workspaces))
-        for i,acquisition_worspace in enumerate(acquisition_workspaces):
-            done = acquisition_worspace['env/done']
-            cumulated_reward = acquisition_worspace['env/cumulated_reward']
-            creward = cumulated_reward[done]
-            agents_creward[i] = creward.mean()
-
-        logger.add_scalar(f"monitor/n_interactions", n_interactions, n_interactions)
-        logger.add_scalar(f"monitor/reward", agents_creward.mean().item(), n_interactions)
-        logger.add_scalar(f"monitor/reward_best", agents_creward.max().item(), n_interactions)
-            
-        cem_rl.train(acquisition_workspaces,n_interactions,logger)
 
 
 @hydra.main(config_path=os.path.join(os.getcwd(),'run_launcher/configs/'), config_name="cem_rl.yaml")

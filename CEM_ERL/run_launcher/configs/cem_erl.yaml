@@ -1,9 +1,14 @@
+data :
+  logger_interval : 5000
+  path : td3_cartpole-v1_run5.csv
+
+
 algorithm:
-  env_seed: 522
+  env_seed: 472
   n_envs: 5
   num_processes : 8
   max_epochs: 1000
-  max_steps : 500000
+  max_steps : 250000
   batch_size: 128
   discount_factor: 0.995
 
@@ -54,7 +59,7 @@ algorithm:
     pop_size:  15
     elites_nb: 3
     diag_cov : True
-    active : True
+    active : False
     steps_es : 1
   # es_algorithm:
   #   classname: ES.sepCEM.SepCEM
@@ -71,11 +76,12 @@ algorithm:
     classname: torch.optim.Adam
     lr: 0.001
 
+
 env:
   classname: utils.make_gym_env
-  #env_name: CartPoleContinuous-v1
-  env_name: Pendulum-v1
-  max_episode_steps:  200
+  env_name: CartPoleContinuous-v1
+  #env_name: Pendulum-v1
+  max_episode_steps:  500
 
 logger:
   classname: salina.logger.TFLogger

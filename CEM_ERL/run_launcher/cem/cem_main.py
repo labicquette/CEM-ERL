@@ -2,7 +2,7 @@ import sys
 import os
 import gym
 import hydra
-#import my_gym
+import my_gym
 import csv
 import torch
 import tqdm
@@ -111,14 +111,15 @@ def synchronized_train_multi(cfg):
         timing = time()
 
         if(n_interactions - tmp_steps > cfg.data.logger_interval):
-            tmp_steps = n_interactions
-            with open(os.path.join(os.getcwd(),cfg.data.path), "w", newline='') as f:
+            tmp_steps += cfg.data.logger_interval
+            with open(os.path.join(os.getcwd(),cfg.data.path), "a+", newline='') as f:
                 writer = csv.writer(f)
                 # csv file : steps,  reward, best reward, reward elite
-                writer.writerow([n_interactions, 
+                writer.writerow([tmp_steps, 
                                 agents_creward.mean().item(),
                                 agents_creward.max().item(),
                                 elites.mean().item()])
+            
 
         if rl_active :
             cem.rl_activation = epoch % cfg.algorithm.es_algorithm.steps_es == 0
